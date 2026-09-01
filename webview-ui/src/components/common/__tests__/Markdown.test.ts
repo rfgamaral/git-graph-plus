@@ -30,6 +30,24 @@ describe('Markdown', () => {
     expect(container.querySelector('pre code')?.textContent).toContain('code');
   });
 
+  it('renders markup characters in inline code instead of visible HTML entities', () => {
+    const snippet = '<if test="onlyHasVideo==true">';
+    const { container } = render(Markdown, { props: { text: `- \`${snippet}\`` } });
+
+    expect(container.querySelector('.md-codespan')?.textContent).toBe(snippet);
+    expect(container.querySelector('if')).toBeNull();
+  });
+
+  it('decodes marked inline-code entities exactly once', () => {
+    const { container } = render(Markdown, {
+      props: { text: '`&lt;script&gt;alert(1)&lt;/script&gt;`' },
+    });
+
+    expect(container.querySelector('.md-codespan')?.textContent)
+      .toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(container.querySelector('script')).toBeNull();
+  });
+
   it('renders nested unordered lists', () => {
     const { container } = render(Markdown, { props: { text: '- a\n  - b' } });
     const outer = container.querySelector('ul');

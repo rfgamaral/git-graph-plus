@@ -24,6 +24,22 @@
   function safeHref(href: string): string | undefined {
     return /^https?:\/\//i.test(href) ? href : undefined;
   }
+
+  function decodeMarkedCodeSpan(text: string): string {
+    // Marked escapes code spans for insertion into an HTML string. This
+    // renderer uses Svelte text nodes instead, so reverse exactly that one
+    // escaping pass; Svelte still keeps the resulting text inert in the DOM.
+    return text.replace(/&(?:amp|lt|gt|quot|#39);/g, (entity) => {
+      switch (entity) {
+        case '&amp;': return '&';
+        case '&lt;': return '<';
+        case '&gt;': return '>';
+        case '&quot;': return '"';
+        case '&#39;': return "'";
+        default: return entity;
+      }
+    });
+  }
 </script>
 
 {#each tokens as tok}
@@ -89,7 +105,7 @@
     <del><Self tokens={d.tokens} /></del>
   {:else if tok.type === 'codespan'}
     {@const cs = tok as Tokens.Codespan}
-    <code class="md-codespan">{cs.text}</code>
+    <code class="md-codespan">{decodeMarkedCodeSpan(cs.text)}</code>
   {:else if tok.type === 'br'}
     <br />
   {:else if tok.type === 'link'}

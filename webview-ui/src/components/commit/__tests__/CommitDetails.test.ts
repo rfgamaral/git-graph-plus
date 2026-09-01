@@ -1336,6 +1336,16 @@ describe('CommitDetails — markdown toggle', () => {
     expect(container.querySelector('.message-section strong')?.textContent).toBe('bold');
   });
 
+  it('renders inline code with markup characters without exposing HTML entities', () => {
+    const snippet = '<if test="onlyHasVideo==true">';
+    const { container } = render(CommitDetails, {
+      commit: commit({ body: `- \`${snippet}\``, parents: [] }),
+    });
+
+    expect(container.querySelector('.message-section .md-codespan')?.textContent).toBe(snippet);
+    expect(container.querySelector('.message-section if')).toBeNull();
+  });
+
   it('switches to plain text when the Plain toggle is clicked', async () => {
     const { container, getByText } = render(CommitDetails, {
       commit: commit({ subject: '**bold** subject', body: '- one\n- two', parents: [] }),
