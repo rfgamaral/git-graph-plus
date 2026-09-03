@@ -17,6 +17,7 @@ class UiStore {
   bottomPanelHeight = $state(250);
   showBottomPanel = $state(true);
   defaultCommitTab = $state<'details' | 'changes'>('details');
+  dateTimeFormat = $state('DD.MM.YYYY HH:mm:ss');
   // Drives a "focus this commit in the graph" request (e.g. clicking a parent
   // link in the details panel). Nonce so repeated focus of the same hash
   // re-scrolls; hash tells the graph which row to centre on.

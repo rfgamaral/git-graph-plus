@@ -675,4 +675,8 @@ export const ko: Record<string, string> = {
   'setUpstream.willCreate.post': '를 실행하여 새로 생성합니다.',
   'setUpstream.typeManually': '직접 입력',
   'setUpstream.selectFromList': '목록에서 선택',
+
+  // Relative date words (used by the `R` token in the date/time format)
+  'date.today': '오늘',
+  'date.yesterday': '어제',
 };

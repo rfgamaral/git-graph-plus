@@ -7,6 +7,7 @@
   import { t } from '../../lib/i18n/index.svelte';
   import { avatarStore } from '../../lib/stores/avatars.svelte';
   import { requestDirtyState } from '../../lib/utils/dirty-check';
+  import { formatDateTime } from '../../lib/utils/date-format';
   import { resolveGraphColor } from '../../lib/utils/graph-color';
   import { graphColorsStore } from '../../lib/stores/graph-colors.svelte';
   import ContextMenu from '../common/ContextMenu.svelte';
@@ -1257,15 +1258,7 @@
   }
 
   function formatDate(dateStr: string): string {
-    const d = new Date(dateStr);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = d.getHours();
-    const mins = String(d.getMinutes()).padStart(2, '0');
-    const ampm = hours < 12 ? 'AM' : 'PM';
-    const h12 = hours % 12 || 12;
-    return `${year}-${month}-${day} ${ampm} ${h12}:${mins}`;
+    return formatDateTime(dateStr, uiStore.dateTimeFormat);
   }
 
   // Keep the viewport size in sync with the actual container. Its height changes
@@ -1390,7 +1383,7 @@
         {/if}
       </div>
       <div class="col-hash" use:tooltip={commit.hash !== 'UNCOMMITTED' ? commit.hash : ''}>{commit.hash !== 'UNCOMMITTED' ? commit.abbreviatedHash : ''}</div>
-      <div class="col-date" use:tooltip={commit.hash !== 'UNCOMMITTED' ? new Date(commit.author.date).toLocaleString() : ''}>{commit.hash !== 'UNCOMMITTED' ? formatDate(commit.author.date) : ''}</div>
+      <div class="col-date" use:tooltip={commit.hash !== 'UNCOMMITTED' ? formatDate(commit.author.date) : ''}>{commit.hash !== 'UNCOMMITTED' ? formatDate(commit.author.date) : ''}</div>
     {/snippet}
 
     <!-- Column headers -->

@@ -7,6 +7,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { avatarStore } from '../../lib/stores/avatars.svelte';
+  import { formatDateTime } from '../../lib/utils/date-format';
   import FileDiffView from './FileDiffView.svelte';
   import type { ReverseTarget } from './FileDiffView.svelte';
   import ContextMenu from '../common/ContextMenu.svelte';
@@ -385,7 +386,7 @@
   });
 
   function formatFullDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleString();
+    return formatDateTime(dateStr, uiStore.dateTimeFormat);
   }
 
   function handleParentMouseEnter(e: MouseEvent, hash: string) {
