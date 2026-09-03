@@ -183,7 +183,9 @@
   let resizeStartX = 0;
   let resizeStartWidth = 0;
   // svelte-ignore state_referenced_locally
-  let activeTab = $state<'commit' | 'changes'>(commit ? 'commit' : 'changes');
+  let activeTab = $state<'commit' | 'changes'>(
+    commit ? (uiStore.defaultCommitTab === 'changes' ? 'changes' : 'commit') : 'changes',
+  );
   let uncommittedTab = $state<'staged' | 'unstaged'>('staged');
 
   let activeHash = $state('');
@@ -264,6 +266,7 @@
         activeTab = 'changes';
         vscode.postMessage({ type: 'getUncommittedDiff' });
       } else if (hash) {
+        activeTab = uiStore.defaultCommitTab === 'changes' ? 'changes' : 'commit';
         vscode.postMessage({ type: 'getCommitDiff', payload: { hash } });
         vscode.postMessage({ type: 'getLfsFiles' });
         vscode.postMessage({ type: 'getCommitSignature', payload: { hash } });

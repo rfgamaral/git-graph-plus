@@ -16,6 +16,7 @@ class UiStore {
   viewMode = $state<'graph' | 'log' | 'stats'>('graph');
   bottomPanelHeight = $state(250);
   showBottomPanel = $state(true);
+  defaultCommitTab = $state<'details' | 'changes'>('details');
   sidebarWidth = $state(220);
   errorMessage = $state<string | null>(null);
   repos = $state<Array<{ path: string; name: string; type: 'root' | 'submodule' | 'nested' }>>([]);
