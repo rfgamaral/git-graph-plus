@@ -386,7 +386,8 @@
             "auto",
             "en",
             "ko",
-            "zh-cn"
+            "zh-cn",
+            "ru"
           ],
           "default": "auto",
           "description": "UI language (auto = follow VS Code language setting)"
@@ -546,8 +547,8 @@
         },
         "gitGraphPlus.dateTimeFormat": {
           "type": "string",
-          "default": "DD.MM.YYYY HH:mm:ss",
-          "markdownDescription": "Format for commit timestamps. Tokens: `YYYY` year, `MM` month, `DD` day, `HH` hour (24h), `hh` hour (12h), `mm` minute, `ss` second, `A` AM/PM. Any other characters pass through. Example: `DD.MM.YYYY HH:mm` → `03.09.2026 14:30`."
+          "default": "R HH:mm:ss",
+          "markdownDescription": "Format for commit timestamps. Tokens: `YYYY` year, `MM` month, `DD` day, `HH` hour (24h), `hh` hour (12h), `mm` minute, `ss` second, `A` AM/PM, `R` today/yesterday word (localized) or numeric `DD.MM.YYYY`. Any other characters pass through. Examples: `DD.MM.YYYY HH:mm` → `03.09.2026 14:30`; `R HH:mm:ss` → `today 14:30:45`."
         },
         "gitGraphPlus.defaults.push.force": { "type": "string", "enum": ["none", "with-lease", "force"], "default": "none", "markdownDescription": "⚠️ `with-lease`/`force` pre-checks a force push, which can overwrite remote history." },
         "gitGraphPlus.defaults.push.setUpstream": { "type": "boolean", "default": true, "markdownDescription": "Set the upstream tracking reference with `-u` when pushing." },

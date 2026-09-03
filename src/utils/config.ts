@@ -89,7 +89,7 @@ export function readDefaultCommitTab(): 'details' | 'changes' {
 }
 
 /** Default format pattern for commit timestamps. */
-const DEFAULT_DATE_TIME_FORMAT = 'DD.MM.YYYY HH:mm:ss';
+const DEFAULT_DATE_TIME_FORMAT = 'R HH:mm:ss';
 
 /**
  * Reads `gitGraphPlus.dateTimeFormat` — the token pattern used to render

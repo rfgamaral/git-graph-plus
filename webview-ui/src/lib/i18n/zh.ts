@@ -675,4 +675,8 @@ export const zh: Record<string, string> = {
   'setUpstream.willCreate.post': ' 进行创建。',
   'setUpstream.typeManually': '手动输入',
   'setUpstream.selectFromList': '从列表选择',
+
+  // Relative date words (used by the `R` token in the date/time format)
+  'date.today': '今天',
+  'date.yesterday': '昨天',
 };

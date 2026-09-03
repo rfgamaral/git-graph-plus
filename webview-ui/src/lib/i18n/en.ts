@@ -677,4 +677,8 @@ export const en: Record<string, string> = {
   'setUpstream.willCreate.post': ' will create it.',
   'setUpstream.typeManually': 'Type manually',
   'setUpstream.selectFromList': 'Select from list',
+
+  // Relative date words (used by the `R` token in the date/time format)
+  'date.today': 'Today',
+  'date.yesterday': 'Yesterday',
 };

@@ -1,8 +1,9 @@
 import { en } from './en';
 import { ko } from './ko';
 import { zh } from './zh';
+import { ru } from './ru';
 
-const dictionaries: Record<string, Record<string, string>> = { en, ko, zh };
+const dictionaries: Record<string, Record<string, string>> = { en, ko, zh, ru };
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;')

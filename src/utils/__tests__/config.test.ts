@@ -170,8 +170,8 @@ describe('readDefaultCommitTab', () => {
 describe('readDateTimeFormat', () => {
   beforeEach(() => { h.values = {}; });
 
-  it('defaults to DD.MM.YYYY HH:mm:ss when unset', () => {
-    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
+  it('defaults to R HH:mm:ss when unset', () => {
+    expect(readDateTimeFormat()).toBe('R HH:mm:ss');
   });
 
   it('returns a custom format', () => {
@@ -181,8 +181,8 @@ describe('readDateTimeFormat', () => {
 
   it('falls back to the default for an empty or non-string value', () => {
     h.values.dateTimeFormat = '';
-    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
+    expect(readDateTimeFormat()).toBe('R HH:mm:ss');
     h.values.dateTimeFormat = 42;
-    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
+    expect(readDateTimeFormat()).toBe('R HH:mm:ss');
   });
 });
