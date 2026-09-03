@@ -17,6 +17,11 @@ class UiStore {
   bottomPanelHeight = $state(250);
   showBottomPanel = $state(true);
   defaultCommitTab = $state<'details' | 'changes'>('details');
+  // Drives a "focus this commit in the graph" request (e.g. clicking a parent
+  // link in the details panel). Nonce so repeated focus of the same hash
+  // re-scrolls; hash tells the graph which row to centre on.
+  focusCommitHash = $state<string | null>(null);
+  focusCommitNonce = $state(0);
   sidebarWidth = $state(220);
   errorMessage = $state<string | null>(null);
   repos = $state<Array<{ path: string; name: string; type: 'root' | 'submodule' | 'nested' }>>([]);
@@ -51,6 +56,11 @@ class UiStore {
     if (hash) {
       this.showBottomPanel = true;
     }
+  }
+
+  focusCommit(hash: string) {
+    this.focusCommitHash = hash;
+    this.focusCommitNonce++;
   }
 
   // Plain click: single selection with toggle-off when re-clicking the sole selection.

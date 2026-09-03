@@ -56,6 +56,8 @@ beforeEach(() => {
   globalThis.__postedMessages = [];
   commitStore.commits = [];
   uiStore.selectedCommitHash = null;
+  uiStore.focusCommitHash = null;
+  uiStore.focusCommitNonce = 0;
   uiStore.commitDetailFullscreen = false;
   uiStore.comparing = false;
   uiStore.showBottomPanel = true;
@@ -335,14 +337,28 @@ describe('CommitDetails — parent links', () => {
     expect(container.querySelectorAll('.parent-link').length).toBe(2);
   });
 
-  it('clicking a parent updates uiStore.selectedCommitHash and posts searchByHash', async () => {
+  it('clicking a parent in the loaded graph selects it and focuses the graph', async () => {
+    commitStore.commits = [commit({ hash: 'parentHash1' })];
     const { container } = render(CommitDetails, { commit: commit({ parents: ['parentHash1', 'parentHash2'] }) });
     await waitFor(() => container.querySelector('.parent-link'));
     globalThis.__postedMessages = [];
     await fireEvent.click(container.querySelector<HTMLButtonElement>('.parent-link')!);
     expect(uiStore.selectedCommitHash).toBe('parentHash1');
+    expect(uiStore.selectedCommitHashes).toEqual(['parentHash1']);
+    expect(uiStore.focusCommitHash).toBe('parentHash1');
     expect(globalThis.__postedMessages.some(
       (m) => (m.data as { type?: string }).type === 'searchByHash'
+    )).toBe(false);
+  });
+
+  it('clicking a parent outside the loaded graph posts a notification and keeps the selection', async () => {
+    const { container } = render(CommitDetails, { commit: commit({ parents: ['parentHash1'] }) });
+    await waitFor(() => container.querySelector('.parent-link'));
+    globalThis.__postedMessages = [];
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.parent-link')!);
+    expect(uiStore.selectedCommitHash).toBeNull();
+    expect(globalThis.__postedMessages.some(
+      (m) => (m.data as { type?: string }).type === 'showNotification'
     )).toBe(true);
   });
 

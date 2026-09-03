@@ -253,6 +253,7 @@ export const en: Record<string, string> = {
   'details.date': 'Date',
   'details.sha': 'SHA',
   'details.parents': 'Parents',
+  'details.commitOutsideGraph': 'This commit is not in the loaded graph — it may be filtered out or outside the loaded history.',
   'details.refs': 'Refs',
   'details.signature': 'Signature',
   'signature.verified': 'Verified',

@@ -253,6 +253,7 @@ export const zh: Record<string, string> = {
   'details.date': '日期',
   'details.sha': 'SHA',
   'details.parents': '父提交',
+  'details.commitOutsideGraph': '此提交不在已加载的图中 — 可能已被过滤掉，或超出已加载的历史范围。',
   'details.refs': '引用',
   'details.signature': '签名',
   'signature.verified': '已验证',
