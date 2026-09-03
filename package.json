@@ -526,6 +526,11 @@
           },
           "markdownDescription": "Map commit-author emails to explicit avatar image URLs. Used when an email has neither a Gravatar account nor a GitHub `noreply` address, so the author still shows a real avatar. Keys are matched case-insensitively. Example: `{ \"you@example.com\": \"https://avatars.githubusercontent.com/u/12345\" }`. Entries whose value is not an `https://` URL are ignored."
         },
+        "gitGraphPlus.fetchLfsLocks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Fetch LFS file-lock status from the remote so locked files are marked in the file tree. Disable this when the repository's remote has no LFS lock server (e.g. some on-premise hosts) to stop background `git lfs locks` requests and the error popups they produce."
+        },
         "gitGraphPlus.defaults.push.force": { "type": "string", "enum": ["none", "with-lease", "force"], "default": "none", "markdownDescription": "⚠️ `with-lease`/`force` pre-checks a force push, which can overwrite remote history." },
         "gitGraphPlus.defaults.push.setUpstream": { "type": "boolean", "default": true, "markdownDescription": "Set the upstream tracking reference with `-u` when pushing." },
         "gitGraphPlus.defaults.push.allTags": { "type": "boolean", "default": false, "markdownDescription": "Also push all tags (`--tags`)." },

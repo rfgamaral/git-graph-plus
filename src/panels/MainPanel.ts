@@ -5,7 +5,7 @@ import { GitService, GitError } from '../git/git-service';
 import { formatGitError, isAuthFailure, transportFromRemoteUrl } from '../git/git-error-formatter';
 import { splitUpstreamRef } from '../git/git-parser';
 import { samePath } from '../utils/path';
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides } from '../utils/config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
@@ -1384,7 +1384,7 @@ export class MainPanel {
         // --- LFS ---
         case 'getLfsFiles': {
           const lfsFiles = await this.gitService.lfsLsFiles();
-          const lfsLocks = await this.gitService.lfsLocks();
+          const lfsLocks = readFetchLfsLocks() ? await this.gitService.lfsLocks() : [];
           this.post({ type: 'lfsData', payload: { files: lfsFiles, locks: lfsLocks } });
           break;
         }
