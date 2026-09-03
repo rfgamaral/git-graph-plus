@@ -87,3 +87,15 @@ export function readDefaultCommitTab(): 'details' | 'changes' {
   const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('defaultCommitTab', 'details');
   return raw === 'changes' ? 'changes' : 'details';
 }
+
+/** Default format pattern for commit timestamps. */
+const DEFAULT_DATE_TIME_FORMAT = 'DD.MM.YYYY HH:mm:ss';
+
+/**
+ * Reads `gitGraphPlus.dateTimeFormat` — the token pattern used to render
+ * commit timestamps. Falls back to the default when unset/empty.
+ */
+export function readDateTimeFormat(): string {
+  const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('dateTimeFormat', DEFAULT_DATE_TIME_FORMAT);
+  return typeof raw === 'string' && raw.trim() !== '' ? raw : DEFAULT_DATE_TIME_FORMAT;
+}

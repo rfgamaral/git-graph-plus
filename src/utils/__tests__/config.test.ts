@@ -13,7 +13,7 @@ vi.mock('vscode', () => ({
   },
 }));
 
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab } from '../config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat } from '../config';
 
 describe('readTimeoutMs', () => {
   // Back-compat alias so the existing timeout cases below read naturally.
@@ -164,5 +164,25 @@ describe('readDefaultCommitTab', () => {
   it('falls back to details for an invalid value', () => {
     h.values.defaultCommitTab = 'bogus';
     expect(readDefaultCommitTab()).toBe('details');
+  });
+});
+
+describe('readDateTimeFormat', () => {
+  beforeEach(() => { h.values = {}; });
+
+  it('defaults to DD.MM.YYYY HH:mm:ss when unset', () => {
+    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
+  });
+
+  it('returns a custom format', () => {
+    h.values.dateTimeFormat = 'YYYY-MM-DD HH:mm';
+    expect(readDateTimeFormat()).toBe('YYYY-MM-DD HH:mm');
+  });
+
+  it('falls back to the default for an empty or non-string value', () => {
+    h.values.dateTimeFormat = '';
+    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
+    h.values.dateTimeFormat = 42;
+    expect(readDateTimeFormat()).toBe('DD.MM.YYYY HH:mm:ss');
   });
 });

@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Commit } from '../../lib/types';
   import { avatarStore } from '../../lib/stores/avatars.svelte';
+  import { uiStore } from '../../lib/stores/ui.svelte';
+  import { formatDateTime } from '../../lib/utils/date-format';
   import { onMount } from 'svelte';
 
   interface Props {
@@ -15,7 +17,7 @@
   let cardEl: HTMLDivElement | undefined = $state();
 
   function formatFullDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleString();
+    return formatDateTime(dateStr, uiStore.dateTimeFormat);
   }
 
   // Keep within viewport

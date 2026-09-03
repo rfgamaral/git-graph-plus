@@ -141,6 +141,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setDefaultCommitTab':
           uiStore.defaultCommitTab = msg.payload.tab;
           break;
+        case 'setDateTimeFormat':
+          uiStore.dateTimeFormat = msg.payload.format;
+          break;
         case 'setGraphColors':
           graphColorsStore.set(msg.payload.colors);
           break;
