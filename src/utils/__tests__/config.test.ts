@@ -13,7 +13,7 @@ vi.mock('vscode', () => ({
   },
 }));
 
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides } from '../config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides, readFetchLfsLocks } from '../config';
 
 describe('readTimeoutMs', () => {
   // Back-compat alias so the existing timeout cases below read naturally.
@@ -133,5 +133,18 @@ describe('readAvatarOverrides', () => {
   it('ignores a non-object setting', () => {
     h.values.avatarOverrides = 'not-an-object';
     expect(readAvatarOverrides()).toEqual({});
+  });
+});
+
+describe('readFetchLfsLocks', () => {
+  beforeEach(() => { h.values = {}; });
+
+  it('defaults to true when unset', () => {
+    expect(readFetchLfsLocks()).toBe(true);
+  });
+
+  it('returns false when explicitly disabled', () => {
+    h.values.fetchLfsLocks = false;
+    expect(readFetchLfsLocks()).toBe(false);
   });
 });

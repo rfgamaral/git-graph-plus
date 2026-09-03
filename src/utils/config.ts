@@ -69,3 +69,12 @@ export function readAvatarOverrides(): Record<string, string> {
   }
   return out;
 }
+
+/**
+ * Reads `gitGraphPlus.fetchLfsLocks` — whether to fetch LFS file-lock status
+ * from the remote. Defaults to true; disabled on hosts without an LFS lock
+ * server to avoid background `git lfs locks` requests and their error popups.
+ */
+export function readFetchLfsLocks(): boolean {
+  return vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('fetchLfsLocks', true);
+}
