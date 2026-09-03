@@ -78,3 +78,12 @@ export function readAvatarOverrides(): Record<string, string> {
 export function readFetchLfsLocks(): boolean {
   return vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('fetchLfsLocks', true);
 }
+
+/**
+ * Reads `gitGraphPlus.defaultCommitTab` — which tab the commit details panel
+ * opens on when a commit is selected. Falls back to `details`.
+ */
+export function readDefaultCommitTab(): 'details' | 'changes' {
+  const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('defaultCommitTab', 'details');
+  return raw === 'changes' ? 'changes' : 'details';
+}

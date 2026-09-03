@@ -531,6 +531,19 @@
           "default": true,
           "markdownDescription": "Fetch LFS file-lock status from the remote so locked files are marked in the file tree. Disable this when the repository's remote has no LFS lock server (e.g. some on-premise hosts) to stop background `git lfs locks` requests and the error popups they produce."
         },
+        "gitGraphPlus.defaultCommitTab": {
+          "type": "string",
+          "enum": [
+            "details",
+            "changes"
+          ],
+          "enumDescriptions": [
+            "Commit details (metadata, message, signature)",
+            "File changes (diff)"
+          ],
+          "default": "details",
+          "markdownDescription": "Which tab the commit details panel opens on by default when a commit is selected: **details** (commit metadata) or **changes** (file diff)."
+        },
         "gitGraphPlus.defaults.push.force": { "type": "string", "enum": ["none", "with-lease", "force"], "default": "none", "markdownDescription": "⚠️ `with-lease`/`force` pre-checks a force push, which can overwrite remote history." },
         "gitGraphPlus.defaults.push.setUpstream": { "type": "boolean", "default": true, "markdownDescription": "Set the upstream tracking reference with `-u` when pushing." },
         "gitGraphPlus.defaults.push.allTags": { "type": "boolean", "default": false, "markdownDescription": "Also push all tags (`--tags`)." },

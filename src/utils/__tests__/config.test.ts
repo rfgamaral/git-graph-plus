@@ -13,7 +13,7 @@ vi.mock('vscode', () => ({
   },
 }));
 
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides, readFetchLfsLocks } from '../config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab } from '../config';
 
 describe('readTimeoutMs', () => {
   // Back-compat alias so the existing timeout cases below read naturally.
@@ -146,5 +146,23 @@ describe('readFetchLfsLocks', () => {
   it('returns false when explicitly disabled', () => {
     h.values.fetchLfsLocks = false;
     expect(readFetchLfsLocks()).toBe(false);
+  });
+});
+
+describe('readDefaultCommitTab', () => {
+  beforeEach(() => { h.values = {}; });
+
+  it('defaults to details when unset', () => {
+    expect(readDefaultCommitTab()).toBe('details');
+  });
+
+  it('returns changes when selected', () => {
+    h.values.defaultCommitTab = 'changes';
+    expect(readDefaultCommitTab()).toBe('changes');
+  });
+
+  it('falls back to details for an invalid value', () => {
+    h.values.defaultCommitTab = 'bogus';
+    expect(readDefaultCommitTab()).toBe('details');
   });
 });
