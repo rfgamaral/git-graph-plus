@@ -80,10 +80,12 @@
     bisectCulpritHash?: string | null;
     remoteFilter?: string[];
     headJumpNonce?: number;
+    focusCommitHash?: string | null;
+    focusCommitNonce?: number;
     onHeadOffscreenChange?: (offscreen: boolean) => void;
   }
 
-  let { searchMatchedHashes = null, searchNavigateHash = null, bisectActive = false, bisectCulpritHash = null, remoteFilter = [], headJumpNonce = 0, onHeadOffscreenChange = () => {} }: Props = $props();
+  let { searchMatchedHashes = null, searchNavigateHash = null, bisectActive = false, bisectCulpritHash = null, remoteFilter = [], headJumpNonce = 0, focusCommitHash = null, focusCommitNonce = 0, onHeadOffscreenChange = () => {} }: Props = $props();
 
   const vscode = getVsCodeApi();
 
@@ -401,6 +403,20 @@
     if (searchNavigateHash && container) {
       navPath = [];
       scrollHashIntoView(searchNavigateHash, 'center');
+    }
+  });
+
+  // Focus a commit requested from outside the graph (e.g. a parent link in the
+  // details panel). The nonce drives re-scrolls of the same hash; the initial
+  // 0 value is skipped so mounting never jumps.
+  let lastFocusCommitNonce = 0;
+  $effect(() => {
+    if (focusCommitNonce !== lastFocusCommitNonce) {
+      lastFocusCommitNonce = focusCommitNonce;
+      if (focusCommitHash && container) {
+        navPath = [];
+        scrollHashIntoView(focusCommitHash, 'center');
+      }
     }
   });
 

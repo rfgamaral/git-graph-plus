@@ -253,6 +253,7 @@ export const ko: Record<string, string> = {
   'details.date': '날짜',
   'details.sha': 'SHA',
   'details.parents': '부모',
+  'details.commitOutsideGraph': '이 커밋은 로드된 그래프에 없습니다 — 필터링되었거나 로드된 기록 범위 밖일 수 있습니다.',
   'details.refs': '참조',
   'details.signature': '서명',
   'signature.verified': '검증됨',

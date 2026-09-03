@@ -418,6 +418,22 @@
     hoveredHash = null;
   }
 
+  // Navigate to a commit referenced in the details panel (a parent link or a
+  // hover-card). If it is in the loaded graph, select it and focus the graph on
+  // it; otherwise the commit is outside the loaded window / filters, so keep the
+  // current selection and tell the user instead of leaving the panel empty.
+  function navigateToCommit(hash: string) {
+    if (commitStore.getCommit(hash)) {
+      // selectCommit (not a raw selectedCommitHash assignment) so the graph's
+      // selected highlight follows too: a plain assignment leaves the previous
+      // selectedCommitHashes intact, which the graph uses for the highlight.
+      uiStore.selectCommit(hash);
+      uiStore.focusCommit(hash);
+    } else {
+      vscode.postMessage({ type: 'showNotification', payload: { message: t('details.commitOutsideGraph') } });
+    }
+  }
+
   // File tree structure
   interface FileTreeNode {
     name: string;
@@ -771,8 +787,7 @@
                     onmouseenter={(e) => handleParentMouseEnter(e, parent)}
                     onmouseleave={handleParentMouseLeave}
                     onclick={() => {
-                      uiStore.selectedCommitHash = parent;
-                      vscode.postMessage({ type: 'searchByHash', payload: { hash: parent } });
+                      navigateToCommit(parent);
                       handleParentMouseLeave();
                     }}
                   >{parent.substring(0, 7)}</button>
@@ -1200,8 +1215,7 @@
     onClose={handleParentMouseLeave}
     onNavigate={() => {
       if (previewCommit) {
-        uiStore.selectedCommitHash = previewCommit.hash;
-        vscode.postMessage({ type: 'searchByHash', payload: { hash: previewCommit.hash } });
+        navigateToCommit(previewCommit.hash);
         handleParentMouseLeave();
       }
     }}
