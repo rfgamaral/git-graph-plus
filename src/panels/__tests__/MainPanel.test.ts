@@ -437,3 +437,69 @@ describe('MainPanel orchestration logic', () => {
     }
   });
 });
+
+describe('MainPanel author colors', () => {
+  let values: Map<string, unknown>;
+  let update: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    values = new Map();
+    update = vi.fn(async (key: string, value: unknown) => {
+      if (value === undefined) values.delete(key);
+      else values.set(key, value);
+    });
+    MainPanel.setGlobalState({
+      keys: () => [...values.keys()],
+      get: <T>(key: string, fallback?: T) => values.has(key) ? values.get(key) as T : fallback,
+      update,
+    } as import('vscode').Memento);
+  });
+
+  afterEach(() => {
+    values.clear();
+  });
+
+  it('persists normalized author emails and reloads their colors in another repository', async () => {
+    await dispatch({ type: 'saveAuthorColor', payload: { email: ' Alice@Example.COM ', color: '#61afef' } });
+    expect(update).toHaveBeenCalledExactlyOnceWith('authorColor:alice@example.com', '#61afef');
+    expect(postedOfType('authorColor').at(-1)?.payload).toEqual({ email: 'alice@example.com', color: '#61afef' });
+
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    MainPanel.createOrShow(extUri, '/another-repo');
+    await dispatch({ type: 'getAuthorColors' });
+    expect(postedOfType('authorColors').at(-1)?.payload).toEqual({ colors: { 'alice@example.com': '#61afef' } });
+  });
+
+  it('clears only the selected email and leaves it absent on reload', async () => {
+    values.set('authorColor:alice@example.com', '#61AFEF');
+    values.set('authorColor:bob@example.com', '#E06C75');
+    await dispatch({ type: 'saveAuthorColor', payload: { email: ' ALICE@example.com ', color: null } });
+    expect(update).toHaveBeenCalledExactlyOnceWith('authorColor:alice@example.com', undefined);
+    expect(postedOfType('authorColor').at(-1)?.payload).toEqual({ email: 'alice@example.com', color: null });
+    await dispatch({ type: 'getAuthorColors' });
+    expect(postedOfType('authorColors').at(-1)?.payload).toEqual({ colors: { 'bob@example.com': '#E06C75' } });
+  });
+
+  it('loads only author color entries containing six-digit hex colors', async () => {
+    values.set('authorColor:alice@example.com', '#61AFEF');
+    values.set('authorColor:invalid@example.com', '#abc');
+    values.set('authorColor:object@example.com', {});
+    values.set('unrelated', '#E06C75');
+    await dispatch({ type: 'getAuthorColors' });
+    expect(postedOfType('authorColors').at(-1)?.payload).toEqual({ colors: { 'alice@example.com': '#61AFEF' } });
+  });
+
+  it.each([
+    { email: ' ', color: '#61AFEF' },
+    { email: 42, color: '#61AFEF' },
+    { email: 'x'.repeat(1001), color: '#61AFEF' },
+    { email: 'alice@example.com', color: '#abc' },
+    { email: 'alice@example.com', color: '#GGGGGG' },
+    { email: 'alice@example.com', color: 123456 },
+    {},
+  ])('rejects invalid author color payload %#', async (payload) => {
+    await dispatch({ type: 'saveAuthorColor', payload });
+    expect(update).not.toHaveBeenCalled();
+    expect(postedOfType('authorColor')).toHaveLength(0);
+  });
+});

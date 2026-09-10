@@ -522,6 +522,16 @@
           "default": true,
           "markdownDescription": "Automatically link references based on the `origin` remote. `!123` (GitLab merge requests) is linked for **any** host, including self-hosted GitLab. `#123` (issues) is linked for **github.com** and **gitlab.com** only — on a self-hosted host the issue path can't be determined, so add a `gitGraphPlus.commitMessageLinks` rule for those."
         },
+        "gitGraphPlus.authorColors": {
+          "type": "object",
+          "default": {},
+          "scope": "application",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "markdownDescription": "Map author emails to highlight colors across repositories. Colors must be six-digit hex values, such as `#63b0f4`. Email keys are matched case-insensitively. Changes made with the author color picker update this setting."
+        },
         "gitGraphPlus.avatarOverrides": {
           "type": "object",
           "default": {},

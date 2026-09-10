@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
+  import { authorColorsStore } from '../../lib/stores/author-colors.svelte';
   import { commitStore } from '../../lib/stores/commits.svelte';
   import { branchStore } from '../../lib/stores/branches.svelte';
   import { uiStore } from '../../lib/stores/ui.svelte';
@@ -469,7 +470,7 @@
       for (const commit of displayCommits) {
         if (commit.hash === 'UNCOMMITTED') continue;
         const text = index === 0 ? commit.author.name : index === 1 ? commit.abbreviatedHash : formatDate(commit.author.date);
-        const decorations = index === 0 ? 22 + (commit.signatureStatus && commit.signatureStatus !== 'none' ? parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0) : 0;
+        const decorations = index === 0 ? 28 + (commit.signatureStatus && commit.signatureStatus !== 'none' ? parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0) : 0;
         width = Math.max(width, context.measureText(text).width + decorations + 20);
       }
       return Math.max(MIN_COLUMN_WIDTHS[index], Math.min(100000, Math.ceil(width)));
@@ -1267,6 +1268,11 @@
       { label: t('graph.copyCommitInfo'), action: () => vscode.postMessage({ type: 'copyToClipboard', payload: { text: `${commit.abbreviatedHash} - ${commit.subject}` } }) },
     );
     groups.push(copyGroup);
+    groups.push([{
+      label: 'Highlight author…',
+      disabled: !commit.author.email.trim(),
+      action: () => authorColorsStore.open(commit.author.email, e.clientX, e.clientY),
+    }]);
 
     // Flatten groups with separators between them, preceded by a separator if there were refs
     if (refs.length > 0) items.push(sep);
@@ -1370,7 +1376,7 @@
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     // Ignore while a modal is open, a multi-select range is armed, or the user
     // is typing in an input (e.g. the search box).
-    if (modalStore.anyOpen || uiStore.multiSelectArmed) return;
+    if (modalStore.anyOpen || authorColorsStore.picker || uiStore.multiSelectArmed) return;
     const el = document.activeElement as HTMLElement | null;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
                el.tagName === 'SELECT' || el.isContentEditable)) return;
@@ -1426,16 +1432,18 @@
     {#snippet metaCells(commit: typeof displayCommits[0])}
       <div class="col-author">
         {#if commit.hash !== 'UNCOMMITTED'}
-          <span class="author-id" use:tooltip={commit.author.name}>
-            <img class="avatar-sm" src={avatarStore.url(commit.author.email, 20)} alt="" />
-            <span class="author-name truncate">{commit.author.name}</span>
+          <span class="author-highlight" style:box-shadow={authorColorsStore.color(commit.author.email) ? `inset 0 0 0 1px ${authorColorsStore.color(commit.author.email)}` : undefined}>
+            <span class="author-id" use:tooltip={commit.author.name}>
+              <img class="avatar-sm" src={avatarStore.url(commit.author.email, 20)} alt="" />
+              <span class="author-name truncate">{commit.author.name}</span>
+            </span>
+            {#if commit.signatureStatus && commit.signatureStatus !== 'none'}
+              <i
+                class="codicon codicon-{commit.signatureStatus === 'good' ? 'pass' : 'question'} sig-icon sig-icon-{commit.signatureStatus}"
+                use:tooltip={commit.signatureStatus === 'good' ? t('signature.verified') : t('signature.unverified')}
+              ></i>
+            {/if}
           </span>
-          {#if commit.signatureStatus && commit.signatureStatus !== 'none'}
-            <i
-              class="codicon codicon-{commit.signatureStatus === 'good' ? 'pass' : 'question'} sig-icon sig-icon-{commit.signatureStatus}"
-              use:tooltip={commit.signatureStatus === 'good' ? t('signature.verified') : t('signature.unverified')}
-            ></i>
-          {/if}
         {/if}
       </div>
       <div class="col-hash" use:tooltip={commit.hash !== 'UNCOMMITTED' ? commit.hash : ''}>{commit.hash !== 'UNCOMMITTED' ? commit.abbreviatedHash : ''}</div>
@@ -2195,11 +2203,22 @@
     gap: 4px;
   }
 
+  .author-highlight {
+    width: 100%;
+    min-width: 0;
+    padding: 3px 3px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
   /* Wraps avatar + name so the author-name tooltip is scoped to them only;
      the signature icon sits outside as a sibling so hovering it doesn't also
      trigger this tooltip (which would overlap two tooltips). min-width:0 lets
      the name truncate while the icon (flex-shrink:0) stays visible. */
   .author-id {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 4px;

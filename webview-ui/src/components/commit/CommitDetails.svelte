@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { authorColorsStore } from '../../lib/stores/author-colors.svelte';
   import type { Commit, DiffData, CommitSignature } from '../../lib/types';
   import { getVsCodeApi } from '../../lib/vscode-api';
   import { branchStore } from '../../lib/stores/branches.svelte';
@@ -672,6 +673,16 @@
                 <div class="person-name">
                   {commit.author.name}
                   <span class="person-email">&lt;{commit.author.email}&gt;</span>
+                  <button
+                    class="author-color-button"
+                    aria-label="Highlight author"
+                    title="Highlight author"
+                    disabled={!commit.author.email.trim()}
+                    onclick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      authorColorsStore.open(commit!.author.email, rect.left, rect.bottom + 4);
+                    }}
+                  ><i class="codicon codicon-chevron-down"></i></button>
                   {#if signature && signature.status !== 'none'}
                     <i
                       class="codicon codicon-{signature.status === 'good' ? 'pass' : 'question'} sig-glyph sig-glyph-{signature.status}"
@@ -1224,6 +1235,30 @@
 {/if}
 
 <style>
+  .author-color-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
+  .author-color-button .codicon {
+    font-size: 10px;
+  }
+
+  .author-color-button:hover {
+    color: var(--text-primary);
+    background: var(--vscode-toolbar-hoverBackground);
+  }
+
   .commit-details {
     height: 100%;
     display: flex;

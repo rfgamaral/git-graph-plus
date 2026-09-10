@@ -99,3 +99,11 @@ export function readDateTimeFormat(): string {
   const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('dateTimeFormat', DEFAULT_DATE_TIME_FORMAT);
   return typeof raw === 'string' && raw.trim() !== '' ? raw : DEFAULT_DATE_TIME_FORMAT;
 }
+
+export function readAuthorColors(): Record<string, string> {
+  const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<unknown>('authorColors', {});
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw)
+    .filter(([email, color]) => email.trim() && email.length <= 1000 && typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))
+    .map(([email, color]) => [email.trim().toLowerCase(), color]));
+}

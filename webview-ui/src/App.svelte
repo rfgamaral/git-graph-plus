@@ -6,6 +6,8 @@
   import { branchStore } from './lib/stores/branches.svelte';
   import { uiStore, BOTTOM_PANEL_DEFAULT_RATIO, BOTTOM_PANEL_MIN_RATIO, BOTTOM_PANEL_MAX_RATIO } from './lib/stores/ui.svelte';
   import { i18n, t } from './lib/i18n/index.svelte';
+  import AuthorColorPicker from './components/common/AuthorColorPicker.svelte';
+  import { authorColorsStore } from './lib/stores/author-colors.svelte';
   import CommitGraph from './components/graph/CommitGraph.svelte';
   import BottomPanel from './components/layout/BottomPanel.svelte';
   import Toolbar from './components/layout/Toolbar.svelte';
@@ -147,6 +149,12 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setDateTimeFormat':
           uiStore.dateTimeFormat = msg.payload.format;
           break;
+        case 'authorColors':
+          authorColorsStore.colors = msg.payload.colors;
+          break;
+        case 'authorColor':
+          authorColorsStore.receive(msg.payload.email, msg.payload.color);
+          break;
         case 'setGraphColors':
           graphColorsStore.set(msg.payload.colors);
           break;
@@ -251,6 +259,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
     vscode.postMessage({ type: 'getLog', payload: {} });
     vscode.postMessage({ type: 'getBranches' });
     vscode.postMessage({ type: 'checkFlowStatus' });
+    vscode.postMessage({ type: 'getAuthorColors' });
 
     // Refresh conflict status when webview becomes visible
     function handleVisibility() {
@@ -842,6 +851,19 @@ import AmendModal from './components/modals/AmendModal.svelte';
       vscode.postMessage({ type: 'flowAction', payload: { flowType: ft, action: 'finish', name } });
     }}
   />
+{/if}
+
+{#if authorColorsStore.picker}
+  {#key authorColorsStore.picker}
+    <AuthorColorPicker
+      email={authorColorsStore.picker.email}
+      color={authorColorsStore.color(authorColorsStore.picker.email)}
+      x={authorColorsStore.picker.x}
+      y={authorColorsStore.picker.y}
+      onApply={(color) => authorColorsStore.save(color)}
+      onClose={() => { authorColorsStore.picker = null; }}
+    />
+  {/key}
 {/if}
 
 <style>

@@ -27,6 +27,8 @@ export interface ModalDefaults {
 
 // Messages from Webview → Extension
 export type WebviewMessage =
+  | { type: 'getAuthorColors' }
+  | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
   | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
   | { type: 'saveGraphColumns'; payload: { repo: string; widths: number[]; requestId?: string } }
   | { type: 'getLog'; payload: { branch?: string; branches?: string[]; limit?: number; skip?: number; remoteFilter?: string[] } }
@@ -133,6 +135,8 @@ export type WebviewMessage =
 
 // Messages from Extension → Webview
 export type ExtensionMessage =
+  | { type: 'authorColors'; payload: { colors: Record<string, string> } }
+  | { type: 'authorColor'; payload: { email: string; color: string | null } }
   | { type: 'logData'; payload: CommitGraphData }
   | { type: 'branchData'; payload: BranchData }
   | { type: 'fullRefresh'; payload: { logData: CommitGraphData; branchData: BranchData } }

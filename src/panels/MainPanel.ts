@@ -5,7 +5,7 @@ import { GitService, GitError } from '../git/git-service';
 import { formatGitError, isAuthFailure, transportFromRemoteUrl } from '../git/git-error-formatter';
 import { splitUpstreamRef } from '../git/git-parser';
 import { samePath } from '../utils/path';
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat } from '../utils/config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readAuthorColors } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
@@ -36,10 +36,10 @@ export class MainPanel {
   private static avatarCacheDir: string | undefined = undefined;
   private static avatarCache: AvatarCache | undefined = undefined;
 
-  private static columnState: vscode.Memento | undefined;
+  private static globalState: vscode.Memento | undefined;
 
-  public static setColumnState(state: vscode.Memento): void {
-    this.columnState = state;
+  public static setGlobalState(state: vscode.Memento): void {
+    this.globalState = state;
   }
 
   private readonly panel: vscode.WebviewPanel;
@@ -246,6 +246,9 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.branchColors')) {
           this.refreshAll();
         }
+        if (e.affectsConfiguration('gitGraphPlus.authorColors')) {
+          this.post({ type: 'authorColors', payload: { colors: readAuthorColors() } });
+        }
         if (e.affectsConfiguration('gitGraphPlus.graphColors')) {
           this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
         }
@@ -420,6 +423,23 @@ export class MainPanel {
   private async handleMessage(message: WebviewMessage): Promise<void> {
     try {
       switch (message.type) {
+        case 'getAuthorColors': {
+          this.post({ type: 'authorColors', payload: { colors: readAuthorColors() } });
+          break;
+        }
+        case 'saveAuthorColor': {
+          const { email, color } = message.payload;
+          if (typeof email !== 'string' || !email.trim() || email.length > 1000) break;
+          if (color !== null && (typeof color !== 'string' || !/^#[0-9a-f]{6}$/i.test(color))) break;
+          const normalizedEmail = email.trim().toLowerCase();
+          const configuration = vscode.workspace.getConfiguration('gitGraphPlus');
+          const raw = configuration.get<unknown>('authorColors', {});
+          const entries = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.entries(raw) : [];
+          const colors = Object.fromEntries(entries.filter(([key]) => key.trim().toLowerCase() !== normalizedEmail));
+          await configuration.update('authorColors', color === null ? colors : { ...colors, [normalizedEmail]: color }, vscode.ConfigurationTarget.Global);
+          this.post({ type: 'authorColor', payload: { email: normalizedEmail, color } });
+          break;
+        }
         case 'getGraphColumns':
         case 'saveGraphColumns': {
           const { repo, requestId } = message.payload;
@@ -428,9 +448,9 @@ export class MainPanel {
           if (message.type === 'saveGraphColumns') {
             const widths = message.payload.widths;
             if (!Array.isArray(widths) || widths.length !== 3 || !widths.every(w => typeof w === 'number' && Number.isFinite(w) && w >= 0 && w <= 100000)) break;
-            await MainPanel.columnState?.update(key, widths);
+            await MainPanel.globalState?.update(key, widths);
           } else {
-            this.post({ type: 'graphColumns', payload: { repo, requestId, widths: MainPanel.columnState?.get(key) } });
+            this.post({ type: 'graphColumns', payload: { repo, requestId, widths: MainPanel.globalState?.get(key) } });
           }
           break;
         }
