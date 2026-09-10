@@ -11,7 +11,7 @@
   "license": "Apache-2.0",
   "icon": "resources/icon-marketplace.png",
   "engines": {
-    "node": "^24.0.0",
+    "node": "^24.11.0",
     "vscode": "^1.85.0"
   },
   "categories": [
@@ -584,10 +584,10 @@
     }
   },
   "scripts": {
-    "build:extension": "node esbuild.config.mjs",
+    "build:extension": "tsdown",
     "build:webview": "cd webview-ui && npm run build",
     "build": "npm run build:extension && npm run build:webview",
-    "watch:extension": "node esbuild.config.mjs --watch",
+    "watch:extension": "tsdown --watch",
     "watch:webview": "cd webview-ui && npm run dev",
     "dev": "concurrently \"npm:watch:*\"",
     "test": "vitest run",
@@ -601,9 +601,9 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
     "concurrently": "^9.0.0",
-    "esbuild": "^0.25.12",
     "happy-dom": "^20.9.0",
     "svelte": "^5.55.7",
+    "tsdown": "^0.23.0",
     "typescript": "^5.5.0",
     "vitest": "^3.2.4"
   },

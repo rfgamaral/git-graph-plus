@@ -14,7 +14,7 @@ webview-ui/index.html
 node_modules/**
 !node_modules/@vscode/codicons/dist/**
 test-repo/**
-esbuild.config.mjs
+tsdown.config.ts
 tsconfig.json
 vitest.config.mts
 coverage/**
