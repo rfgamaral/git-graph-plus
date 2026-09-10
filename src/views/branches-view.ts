@@ -180,7 +180,10 @@ class BranchLeafItem extends vscode.TreeItem {
     super(displayName, vscode.TreeItemCollapsibleState.None);
 
     this.contextValue = branch.current ? 'branch-current' : 'branch';
-    this.iconPath = new vscode.ThemeIcon(branch.current ? 'check' : 'git-branch');
+    const iconColor = branch.upstreamGone
+      ? new vscode.ThemeColor('list.warningForeground')
+      : new vscode.ThemeColor(branch.upstream ? 'foreground' : 'icon.foreground');
+    this.iconPath = new vscode.ThemeIcon(branch.current ? 'check' : 'git-branch', iconColor);
 
 
     if (branch.current) {
@@ -194,7 +197,10 @@ class BranchLeafItem extends vscode.TreeItem {
       this.description = (this.description ? this.description + ' ' : '') + badges.join(' ');
     }
 
-    this.tooltip = `${branch.name}${branch.upstream ? ` → ${branch.upstream}` : ''}`;
+    const trackingStatus = branch.upstreamGone
+      ? `Upstream${branch.upstream ? ` ${branch.upstream}` : ''} no longer exists`
+      : branch.upstream ? `Tracking ${branch.upstream}` : 'No upstream configured';
+    this.tooltip = `${branch.name}\n${trackingStatus}`;
 
     this.command = {
       command: 'gitGraphPlus.showBranchMenu',

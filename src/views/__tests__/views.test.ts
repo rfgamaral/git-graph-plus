@@ -12,7 +12,8 @@ vi.mock('vscode', () => {
     command?: { command: string; title: string; arguments?: unknown[] };
     constructor(public label: string, public collapsibleState: number) {}
   }
-  class ThemeIcon { constructor(public id: string) {} }
+  class ThemeColor { constructor(public id: string) {} }
+  class ThemeIcon { constructor(public id: string, public color?: ThemeColor) {} }
   class EventEmitter {
     private listeners: Array<(arg: unknown) => void> = [];
     event = (cb: (arg: unknown) => void) => { this.listeners.push(cb); return { dispose: () => {} }; };
@@ -22,6 +23,7 @@ vi.mock('vscode', () => {
   return {
     TreeItem,
     ThemeIcon,
+    ThemeColor,
     EventEmitter,
     TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
     commands: { executeCommand: vi.fn() },
@@ -63,6 +65,22 @@ function mockSvc(over: Partial<Record<keyof GitService, unknown>> & { rootPath?:
 const themeId = (i: { iconPath?: unknown }) => (i.iconPath as { id: string }).id;
 
 describe('BranchesViewProvider', () => {
+  it.each([
+    { state: 'untracked', upstream: undefined, upstreamGone: false, color: 'icon.foreground', status: 'No upstream configured' },
+    { state: 'tracked', upstream: 'origin/topic', upstreamGone: false, color: 'foreground', status: 'Tracking origin/topic' },
+    { state: 'upstream gone', upstream: 'origin/topic', upstreamGone: true, color: 'list.warningForeground', status: 'Upstream origin/topic no longer exists' },
+  ])('shows the $state color and tooltip while preserving native icon shapes', async ({ upstream, upstreamGone, color, status }) => {
+    for (const current of [false, true]) {
+      const provider = new BranchesViewProvider(mockSvc({ branches: [branch('topic', { current, upstream, upstreamGone })] }));
+      const [item] = await provider.getChildren();
+      const icon = item.iconPath as vscode.ThemeIcon;
+      expect(icon.id).toBe(current ? 'check' : 'git-branch');
+      expect(icon.color?.id).toBe(color);
+      expect(item.tooltip).toBe(`topic\n${status}`);
+      provider.dispose();
+    }
+  });
+
   it('groups slashed branches into folders and sorts primary branches first', async () => {
     const svc = mockSvc({ branches: [
       branch('feature/login'),
