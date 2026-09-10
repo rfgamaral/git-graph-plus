@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Git Graph Plus is a VS Code extension that provides a full-featured Git GUI — commit graph visualization, branch/tag/stash/worktree management, diff viewer, and more. It uses a **two-process architecture**: a Node.js extension host (backend) and a Svelte 5 webview (frontend).
+Git Graph+ is a VS Code extension that provides a full-featured Git GUI — commit graph visualization, branch/tag/stash/worktree management, diff viewer, and more. It uses a **two-process architecture**: a Node.js extension host (backend) and a Svelte 5 webview (frontend).
 
 ## Build & Development Commands
 

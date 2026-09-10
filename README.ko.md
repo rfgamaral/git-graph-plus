@@ -1,16 +1,12 @@
 # Git Graph+
 
-[![VS Code Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-007ACC?logo=visual-studio-code&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=the0807.git-graph-plus)
-[![Open VSX](https://img.shields.io/badge/Install-Open%20VSX-a60ee5?logo=eclipse-ide&logoColor=white)](https://open-vsx.org/extension/the0807/git-graph-plus)
-
-[![CI](https://github.com/the0807/git-graph-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/the0807/git-graph-plus/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/the0807/git-graph-plus/branch/main/graph/badge.svg)](https://codecov.io/gh/the0807/git-graph-plus)
+[![CI](https://github.com/rfgamaral/git-graph-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rfgamaral/git-graph-plus/actions/workflows/ci.yml)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
 [English](README.md)
 
-VS Code를 위한 모던 Git GUI. 커밋 히스토리를 시각화하고, 브랜치를 관리하고, 고급 Git 작업까지 에디터를 벗어나지 않고 수행할 수 있습니다.
+VS Code에서 직관적인 Git 경험을 제공하는 현대적이고 다양한 기능을 갖춘 Git 시각화 도구입니다.
 
 > 스테이징, 커밋, 인라인 블레임은 VS Code 내장 소스 제어를 사용합니다. Git Graph+는 그 외 모든 것에 집중합니다.
 
@@ -165,7 +161,7 @@ VS Code를 위한 모던 Git GUI. 커밋 히스토리를 시각화하고, 브랜
 
 ## 시작하기
 
-1. [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=the0807.git-graph-plus)에서 설치
+1. Node 24에서 `npm ci`, `npm --prefix webview-ui ci`, `npm run build`, `npm run package`를 실행하여 소스에서 빌드합니다. VS Code에서 **Extensions: Install from VSIX...** 명령을 실행하고 생성된 `.vsix` 파일을 선택합니다.
 2. Git 리포지토리가 포함된 폴더 열기
 3. Git Graph+ 열기:
    - **명령 팔레트** - `Git Graph+: Open`
@@ -229,6 +225,7 @@ VS Code를 위한 모던 Git GUI. 커밋 히스토리를 시각화하고, 브랜
 
 ## 크레딧
 
+- [원본 Git Graph+](https://github.com/the0807/git-graph-plus)에서 파생된 [arumata의 Git Graph+ 포크](https://github.com/arumata/git-graph-plus)를 기반으로 합니다. 두 프로젝트의 개발자와 기여자들에게 감사드립니다.
 - [Git Graph](https://github.com/mhutchie/vscode-git-graph), [Fork](https://git-fork.com/), [SourceGit](https://github.com/sourcegit-scm/sourcegit)의 UI/UX에서 아이디어를 얻었습니다
 - 이 프로젝트는 [Git Graph](https://github.com/mhutchie/vscode-git-graph)의 코드를 사용하지 않으며, 모든 코드는 처음부터 새로 작성되었습니다
 - 확장 아이콘: [VS Code Codicons](https://github.com/microsoft/vscode-codicons), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 라이선스

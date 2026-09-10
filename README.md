@@ -1,16 +1,12 @@
 # Git Graph+
 
-[![VS Code Marketplace](https://img.shields.io/badge/Install-VS%20Code%20Marketplace-007ACC?logo=visual-studio-code&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=the0807.git-graph-plus)
-[![Open VSX](https://img.shields.io/badge/Install-Open%20VSX-a60ee5?logo=eclipse-ide&logoColor=white)](https://open-vsx.org/extension/the0807/git-graph-plus)
-
-[![CI](https://github.com/the0807/git-graph-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/the0807/git-graph-plus/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/the0807/git-graph-plus/branch/main/graph/badge.svg)](https://codecov.io/gh/the0807/git-graph-plus)
+[![CI](https://github.com/rfgamaral/git-graph-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rfgamaral/git-graph-plus/actions/workflows/ci.yml)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
 [한국어](README.ko.md)
 
-A modern, full-featured Git GUI for VS Code. Visualize your commit history, manage branches, and perform advanced git operations - all without leaving your editor.
+A modern and full-featured Git visualization tool for an intuitive Git experience in VS Code.
 
 > Staging, committing, and inline blame use VS Code's built-in Source Control. Git Graph+ focuses on everything else.
 
@@ -165,7 +161,7 @@ A modern, full-featured Git GUI for VS Code. Visualize your commit history, mana
 
 ## Getting Started
 
-1. Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=the0807.git-graph-plus)
+1. Build from source with Node 24: run `npm ci`, `npm --prefix webview-ui ci`, `npm run build`, and `npm run package`. In VS Code, run **Extensions: Install from VSIX...** and select the generated `.vsix` file.
 2. Open a folder containing a Git repository
 3. Open Git Graph+ using any of:
    - **Command Palette** - `Git Graph+: Open`
@@ -229,6 +225,7 @@ Preset the default options for each operation dialog under `gitGraphPlus.default
 
 ## Acknowledgements
 
+- Based on [arumata’s Git Graph+ fork](https://github.com/arumata/git-graph-plus), derived from [the original Git Graph+](https://github.com/the0807/git-graph-plus). Thanks to the authors and contributors of both projects.
 - UI/UX ideas from [Git Graph](https://github.com/mhutchie/vscode-git-graph), [Fork](https://git-fork.com/), and [SourceGit](https://github.com/sourcegit-scm/sourcegit)
 - This project does not use any code from [Git Graph](https://github.com/mhutchie/vscode-git-graph). All code has been written from scratch.
 - Extension icon from [VS Code Codicons](https://github.com/microsoft/vscode-codicons), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

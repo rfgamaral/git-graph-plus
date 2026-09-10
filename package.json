@@ -1,12 +1,12 @@
 {
   "name": "git-graph-plus",
-  "displayName": "Git Graph Plus",
-  "description": "A modern, full-featured Git GUI for VS Code",
+  "displayName": "Git Graph+",
+  "description": "A modern and full-featured Git visualization tool for an intuitive Git experience in VS Code.",
   "version": "0.7.3",
-  "publisher": "the0807",
+  "publisher": "rfgamaral",
   "repository": {
     "type": "git",
-    "url": "https://github.com/the0807/git-graph-plus"
+    "url": "https://github.com/rfgamaral/git-graph-plus"
   },
   "license": "Apache-2.0",
   "icon": "resources/icon-marketplace.png",
