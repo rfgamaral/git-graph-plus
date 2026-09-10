@@ -14,10 +14,6 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [20, 22]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,10 +24,10 @@ jobs:
       - name: Install git-flow
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends git-flow
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version-file: .node-version
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -53,7 +49,6 @@ jobs:
         run: npx vitest run --coverage
 
       - name: Upload coverage to Codecov
-        if: matrix.node-version == 22
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage/lcov.info
@@ -64,7 +59,7 @@ jobs:
       # history. `if: always()` so failed runs still upload (the failures are
       # the most interesting data points).
       - name: Upload test results to Codecov
-        if: always() && matrix.node-version == 22
+        if: always()
         uses: codecov/test-results-action@v1
         with:
           files: ./test-results.xml
