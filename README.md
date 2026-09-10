@@ -237,13 +237,13 @@ with release notes and a versioned installer such as `git-graph-plus-0.8.0.vsix`
 - `fix:` commits produce patch releases, `feat:` commits produce minor releases, and breaking changes produce major releases.
 - Commits such as `docs:` and `chore:` do not trigger a release on their own.
 - The `v0.7.3` tag marks the upstream release baseline; new release notes cover changes after the latest release tag.
-- CI updates the package version and prepends release notes to `CHANGELOG.md` before packaging. These updates are included in the VSIX but are not committed back to the repository.
+- CI updates the package version and prepends release notes to `CHANGELOG.md` before packaging. It then commits `CHANGELOG.md`, `package.json`, and `package-lock.json` back to `main` with `[skip ci]`. The release tag points to this commit.
 - Releases use the automatic `GITHUB_TOKEN`; no additional publishing secrets are required.
 
 ## Changelog
 
-See [GitHub Releases](https://github.com/rfgamaral/git-graph-plus/releases) for new releases. The packaged
-`CHANGELOG.md` includes the current release notes and preserves the history in [CHANGELOG.md](CHANGELOG.md).
+See [GitHub Releases](https://github.com/rfgamaral/git-graph-plus/releases) and [CHANGELOG.md](CHANGELOG.md)
+for release history. New release notes are committed automatically and included in the VSIX.
 
 ## License
 
