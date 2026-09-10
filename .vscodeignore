@@ -28,3 +28,4 @@ resources/*.png
 resources/icon.svg
 resources/icon-marketplace.svg
 webview-ui/package.json
+release.config.cjs

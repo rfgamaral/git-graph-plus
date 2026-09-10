@@ -228,9 +228,22 @@ Preset the default options for each operation dialog under `gitGraphPlus.default
 - This project does not use any code from [Git Graph](https://github.com/mhutchie/vscode-git-graph). All code has been written from scratch.
 - Extension icon from [VS Code Codicons](https://github.com/microsoft/vscode-codicons), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
+## Releases
+
+After type checks, tests, and builds pass on `main`, semantic-release uses Conventional Commits
+to choose the next version and publishes a [GitHub Release](https://github.com/rfgamaral/git-graph-plus/releases)
+with release notes and a versioned installer such as `git-graph-plus-0.8.0.vsix`. Nothing is published to npm or the VS Code Marketplace.
+
+- `fix:` commits produce patch releases, `feat:` commits produce minor releases, and breaking changes produce major releases.
+- Commits such as `docs:` and `chore:` do not trigger a release on their own.
+- The `v0.7.3` tag marks the upstream release baseline; new release notes cover changes after the latest release tag.
+- CI updates the package version and prepends release notes to `CHANGELOG.md` before packaging. These updates are included in the VSIX but are not committed back to the repository.
+- Releases use the automatic `GITHUB_TOKEN`; no additional publishing secrets are required.
+
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release history.
+See [GitHub Releases](https://github.com/rfgamaral/git-graph-plus/releases) for new releases. The packaged
+`CHANGELOG.md` includes the current release notes and preserves the history in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

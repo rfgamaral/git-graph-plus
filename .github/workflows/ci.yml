@@ -8,14 +8,18 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # git-flow is required for the Git Flow integration tests
       # (submodule-lfs-flow.integration.test.ts). Without it those tests
@@ -53,3 +57,45 @@ jobs:
 
       - name: Build webview
         run: npm run build:webview
+
+      - name: Upload release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: |
+            dist/
+            webview-ui/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download release build
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Release VSIX on GitHub
+        run: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
