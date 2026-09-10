@@ -1726,7 +1726,7 @@
                   {@const label = t('graph.uncommitted', { staged: counts.staged ?? 0, unstaged: counts.unstaged ?? 0 })}
                   <span class="commit-subject truncate" use:tooltip={t('graph.clickToOpenScm')}>{label}</span>
                 {:else}
-                  <span class="commit-subject truncate" use:tooltip={commit.subject}><LinkifiedText text={commit.subject} /></span>
+                  <span class="commit-subject truncate" class:head-subject={commit.hash === commitStore.headHash} use:tooltip={commit.subject}><LinkifiedText text={commit.subject} /></span>
                 {/if}
             </div>
               <div class="col-meta">{@render metaCells(commit)}</div>
@@ -2132,6 +2132,10 @@
 
   .commit-row:not(.other-branch) .commit-subject {
     font-weight: normal;
+  }
+
+  .commit-row .commit-subject.head-subject {
+    font-weight: 600;
   }
 
   .commit-row.other-branch .commit-subject,
