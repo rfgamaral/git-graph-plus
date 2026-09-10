@@ -34,6 +34,9 @@ const H = vi.hoisted(() => {
   };
   return {
     git,
+    config: {} as Record<string, unknown>,
+    updateConfig: vi.fn(),
+    configHandler: null as null | ((e: { affectsConfiguration: (key: string) => boolean }) => void),
     messageHandler: null as null | ((m: unknown) => unknown),
     panel: null as null | { webview: { postMessage: ReturnType<typeof vi.fn> } },
     repos: [] as Array<{ path: string; name: string; type: string }>,
@@ -70,10 +73,13 @@ vi.mock('vscode', () => {
       showSaveDialog: vi.fn(async () => undefined),
     },
     workspace: {
-      getConfiguration: () => ({ get: (_k: string, d?: unknown) => d }),
+      getConfiguration: () => ({
+        get: (key: string, fallback?: unknown) => H.config[key] ?? fallback,
+        update: H.updateConfig,
+      }),
       getWorkspaceFolder: () => ({ uri: { fsPath: '/repo' } }),
       workspaceFolders: [{ uri: { fsPath: '/repo' } }],
-      onDidChangeConfiguration: () => ({ dispose() {} }),
+      onDidChangeConfiguration: (cb: NonNullable<typeof H.configHandler>) => { H.configHandler = cb; return { dispose() {} }; },
       fs: { writeFile: vi.fn(async () => {}) },
     },
     commands: { executeCommand: vi.fn() },
@@ -85,6 +91,7 @@ vi.mock('vscode', () => {
       parse: () => ({ with: () => ({}) }),
     },
     ViewColumn: { One: 1 },
+    ConfigurationTarget: { Global: 1 },
   };
 });
 
@@ -113,6 +120,9 @@ async function dispatch(msg: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  H.config = {};
+  H.configHandler = null;
+  H.updateConfig.mockReset().mockImplementation(async (key: string, value: unknown) => { H.config[key] = value; });
   // Reset default git behaviour after clearAllMocks wiped implementations.
   for (const k of Object.keys(H.git)) H.git[k].mockReset();
   H.git.log.mockResolvedValue([]);
@@ -147,6 +157,36 @@ describe('MainPanel construction', () => {
     expect(H.panel).not.toBeNull();
     expect(H.panel!.webview).toBeDefined();
     expect(postedOfType('setLocale').length).toBeGreaterThan(0);
+  });
+});
+
+describe('MainPanel commit details settings', () => {
+  it('posts bottom position and disabled always-visible mode by default', () => {
+    expect(postedOfType('setCommitDetailsPosition').at(-1)?.payload).toEqual({ position: 'bottom' });
+    expect(postedOfType('setAlwaysShowCommitDetails').at(-1)?.payload).toEqual({ enabled: false });
+  });
+
+  it('forwards live changes to both commit details settings', () => {
+    H.config.commitDetailsPosition = 'right';
+    H.config.alwaysShowCommitDetails = true;
+    H.configHandler!({ affectsConfiguration: key => [
+      'gitGraphPlus.commitDetailsPosition', 'gitGraphPlus.alwaysShowCommitDetails',
+    ].includes(key) });
+    expect(postedOfType('setCommitDetailsPosition').at(-1)?.payload).toEqual({ position: 'right' });
+    expect(postedOfType('setAlwaysShowCommitDetails').at(-1)?.payload).toEqual({ enabled: true });
+  });
+
+  it('persists layout requests at user scope and rejects invalid positions', async () => {
+    const vscode = await import('vscode');
+    for (const position of ['right', 'bottom']) {
+      await dispatch({ type: 'setCommitDetailsPosition', payload: { position } });
+      expect(H.updateConfig).toHaveBeenLastCalledWith('commitDetailsPosition', position, vscode.ConfigurationTarget.Global);
+      expect(postedOfType('setCommitDetailsPosition').at(-1)?.payload).toEqual({ position });
+    }
+    H.panel!.webview.postMessage.mockClear();
+    await dispatch({ type: 'setCommitDetailsPosition', payload: { position: 'left' } });
+    expect(H.updateConfig).toHaveBeenCalledTimes(2);
+    expect(postedOfType('setCommitDetailsPosition')).toEqual([]);
   });
 });
 

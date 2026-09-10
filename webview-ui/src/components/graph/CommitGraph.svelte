@@ -866,11 +866,13 @@
       const multiItems: any[] = [];
 
       // Toggle the bottom panel showing the comparison of the selected commits.
-      multiItems.push({
-        label: uiStore.showBottomPanel ? t('graph.hideChanges') : t('graph.viewChanges'),
-        action: () => { uiStore.showBottomPanel = !uiStore.showBottomPanel; },
-      });
-      multiItems.push({ separator: true, label: '', action: () => {} });
+      if (!uiStore.alwaysShowCommitDetails) {
+        multiItems.push({
+          label: uiStore.showBottomPanel ? t('graph.hideChanges') : t('graph.viewChanges'),
+          action: () => { uiStore.showBottomPanel = !uiStore.showBottomPanel; },
+        });
+        multiItems.push({ separator: true, label: '', action: () => {} });
+      }
 
       const chain = getSquashChain(sel, commitStore.commitMap as Map<string, Commit>);
       if (chain) {
@@ -1411,7 +1413,7 @@
     if (bisectBadCommit) { bisectBadCommit = null; }
     else if (bisectCulpritHash) { vscode.postMessage({ type: 'bisectReset' }); }
     // 1st Esc closes the open bottom panel; 2nd Esc clears the selection.
-    else if (uiStore.multiSelectArmed && uiStore.showBottomPanel) { uiStore.showBottomPanel = false; }
+    else if (uiStore.multiSelectArmed && uiStore.showBottomPanel && !uiStore.alwaysShowCommitDetails) { uiStore.showBottomPanel = false; }
     else if (uiStore.multiSelectArmed) { uiStore.exitMultiSelect(); }
   } else {
     handleGraphNavKey(e);

@@ -107,3 +107,7 @@ export function readAuthorColors(): Record<string, string> {
     .filter(([email, color]) => email.trim() && email.length <= 1000 && typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color))
     .map(([email, color]) => [email.trim().toLowerCase(), color]));
 }
+
+export function readCommitDetailsPosition(): 'bottom' | 'right' {
+  return vscode.workspace.getConfiguration('gitGraphPlus').get<string>('commitDetailsPosition', 'bottom') === 'right' ? 'right' : 'bottom';
+}

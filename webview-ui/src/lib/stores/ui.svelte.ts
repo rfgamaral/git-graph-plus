@@ -15,7 +15,19 @@ class UiStore {
   compareRef2 = $state<string | null>(null);
   viewMode = $state<'graph' | 'log' | 'stats'>('graph');
   bottomPanelHeight = $state(250);
-  showBottomPanel = $state(true);
+  rightPanelWidth = $state(400);
+  commitDetailsPosition = $state<'bottom' | 'right'>('bottom');
+  alwaysShowCommitDetails = $state(false);
+  private detailsVisible = $state(true);
+
+  get showBottomPanel() {
+    return this.alwaysShowCommitDetails || this.detailsVisible;
+  }
+
+  set showBottomPanel(visible: boolean) {
+    this.detailsVisible = visible;
+  }
+
   defaultCommitTab = $state<'details' | 'changes'>('details');
   autoFitColumns = $state(false);
   dateTimeFormat = $state('DD.MM.YYYY HH:mm:ss');
@@ -67,7 +79,7 @@ class UiStore {
 
   // Plain click: single selection with toggle-off when re-clicking the sole selection.
   selectSingle(hash: string) {
-    const toggleOff = this.selectedCommitHash === hash && this.selectedCommitHashes.length === 1;
+    const toggleOff = !this.alwaysShowCommitDetails && this.selectedCommitHash === hash && this.selectedCommitHashes.length === 1;
     this.selectCommit(toggleOff ? null : hash);
   }
 

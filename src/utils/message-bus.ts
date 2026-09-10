@@ -27,6 +27,7 @@ export interface ModalDefaults {
 
 // Messages from Webview → Extension
 export type WebviewMessage =
+  | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
   | { type: 'getAuthorColors' }
   | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
   | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
@@ -135,6 +136,8 @@ export type WebviewMessage =
 
 // Messages from Extension → Webview
 export type ExtensionMessage =
+  | { type: 'setAlwaysShowCommitDetails'; payload: { enabled: boolean } }
+  | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
   | { type: 'authorColors'; payload: { colors: Record<string, string> } }
   | { type: 'authorColor'; payload: { email: string; color: string | null } }
   | { type: 'logData'; payload: CommitGraphData }

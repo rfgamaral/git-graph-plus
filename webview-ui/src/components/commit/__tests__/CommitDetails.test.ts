@@ -59,6 +59,8 @@ beforeEach(() => {
   uiStore.focusCommitHash = null;
   uiStore.focusCommitNonce = 0;
   uiStore.commitDetailFullscreen = false;
+  uiStore.commitDetailsPosition = 'bottom';
+  uiStore.alwaysShowCommitDetails = false;
   uiStore.comparing = false;
   uiStore.showBottomPanel = true;
   uiStore.commitFileSelected = false;
@@ -261,18 +263,47 @@ describe('CommitDetails — tabs', () => {
 });
 
 describe('CommitDetails — header actions', () => {
-  it('fullscreen button toggles uiStore.commitDetailFullscreen', async () => {
-    const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.tab-action-btn')!);
+  it('orders layout, expand/restore, and close controls without changing their actions', async () => {
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    expect(Array.from(container.querySelectorAll('.tab-action-btn'), button => button.getAttribute('aria-label'))).toEqual([
+      'Move details to right', 'Expand panel', 'Close',
+    ]);
+    await fireEvent.click(getByRole('button', { name: 'Expand panel' }));
     expect(uiStore.commitDetailFullscreen).toBe(true);
+    expect(Array.from(container.querySelectorAll('.tab-action-btn'), button => button.getAttribute('aria-label'))).toEqual([
+      'Move details to right', 'Restore panel', 'Close',
+    ]);
+    await fireEvent.click(getByRole('button', { name: 'Restore panel' }));
+    expect(uiStore.commitDetailFullscreen).toBe(false);
+  });
+
+  it.each(['bottom', 'right'] as const)('requests the opposite layout from %s without changing the selection', async (position) => {
+    uiStore.commitDetailsPosition = position;
+    uiStore.selectedCommitHash = 'h1';
+    const { getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    const destination = position === 'bottom' ? 'right' : 'bottom';
+    globalThis.__postedMessages = [];
+    await fireEvent.click(getByRole('button', { name: `Move details to ${destination}` }));
+    expect(globalThis.__postedMessages.map(message => message.data)).toContainEqual({
+      type: 'setCommitDetailsPosition', payload: { position: destination },
+    });
+    expect(uiStore.selectedCommitHash).toBe('h1');
+    expect(uiStore.commitDetailFullscreen).toBe(false);
+  });
+
+  it('hides Close in persistent mode but keeps layout and expand available', () => {
+    uiStore.alwaysShowCommitDetails = true;
+    const { queryByRole, getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    expect(queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(getByRole('button', { name: 'Move details to right' })).toBeTruthy();
+    expect(getByRole('button', { name: 'Expand panel' })).toBeTruthy();
   });
 
   it('close button clears the selected commit and hides the panel', async () => {
     uiStore.selectedCommitHash = 'h1';
     uiStore.showBottomPanel = true;
-    const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
-    const btns = container.querySelectorAll<HTMLButtonElement>('.tab-action-btn');
-    await fireEvent.click(btns[btns.length - 1]);
+    const { getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    await fireEvent.click(getByRole('button', { name: 'Close' }));
     expect(uiStore.selectedCommitHash).toBeNull();
     expect(uiStore.showBottomPanel).toBe(false);
   });

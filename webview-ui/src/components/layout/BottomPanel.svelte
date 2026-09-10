@@ -21,7 +21,7 @@
   {:else if armedHint}
     <div class="empty">{t('details.selectMoreCommits')}</div>
   {:else}
-    <div class="empty">{t('details.selectCommit')}</div>
+    <div class="empty">{uiStore.alwaysShowCommitDetails ? t('graph.noCommits') : t('details.selectCommit')}</div>
   {/if}
 </div>
 

@@ -5,7 +5,7 @@ import { GitService, GitError } from '../git/git-service';
 import { formatGitError, isAuthFailure, transportFromRemoteUrl } from '../git/git-error-formatter';
 import { splitUpstreamRef } from '../git/git-parser';
 import { samePath } from '../utils/path';
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readAuthorColors } from '../utils/config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readCommitDetailsPosition, readAuthorColors } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
@@ -225,6 +225,12 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.interactiveRebase.mode')) {
           this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
         }
+        if (e.affectsConfiguration('gitGraphPlus.alwaysShowCommitDetails')) {
+          this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });
+        }
+        if (e.affectsConfiguration('gitGraphPlus.commitDetailsPosition')) {
+          this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
+        }
         if (e.affectsConfiguration('gitGraphPlus.defaultCommitTab')) {
           this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
         }
@@ -276,6 +282,8 @@ export class MainPanel {
     this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
     this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
     this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
+    this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });
+    this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
     this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
     this.post({ type: 'setAutoFitColumns', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('autoFitColumns', false) } });
     this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
@@ -423,6 +431,13 @@ export class MainPanel {
   private async handleMessage(message: WebviewMessage): Promise<void> {
     try {
       switch (message.type) {
+        case 'setCommitDetailsPosition': {
+          const { position } = message.payload;
+          if (position !== 'bottom' && position !== 'right') break;
+          await vscode.workspace.getConfiguration('gitGraphPlus').update('commitDetailsPosition', position, vscode.ConfigurationTarget.Global);
+          this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
+          break;
+        }
         case 'getAuthorColors': {
           this.post({ type: 'authorColors', payload: { colors: readAuthorColors() } });
           break;

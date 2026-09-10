@@ -650,12 +650,22 @@
       </button>
     {/if}
     <div class="tabs-actions">
+      <button
+        class="tab-action-btn"
+        aria-label={uiStore.commitDetailsPosition === 'bottom' ? 'Move details to right' : 'Move details to bottom'}
+        use:tooltip={uiStore.commitDetailsPosition === 'bottom' ? 'Move details to right' : 'Move details to bottom'}
+        onclick={() => vscode.postMessage({ type: 'setCommitDetailsPosition', payload: { position: uiStore.commitDetailsPosition === 'bottom' ? 'right' : 'bottom' } })}
+      >
+        <i class="codicon {uiStore.commitDetailsPosition === 'bottom' ? 'codicon-layout-sidebar-right' : 'codicon-layout-panel'}"></i>
+      </button>
       <button class="tab-action-btn" aria-label={uiStore.commitDetailFullscreen ? t('details.restore') : t('details.fullscreen')} use:tooltip={uiStore.commitDetailFullscreen ? t('details.restore') : t('details.fullscreen')} onclick={() => { uiStore.commitDetailFullscreen = !uiStore.commitDetailFullscreen; }}>
         <i class="codicon {uiStore.commitDetailFullscreen ? 'codicon-chevron-down' : 'codicon-chevron-up'}"></i>
       </button>
-      <button class="tab-action-btn" aria-label={t('common.close')} use:tooltip={t('common.close')} onclick={() => { if (!uiStore.multiSelectArmed) { uiStore.selectCommit(null); } uiStore.showBottomPanel = false; uiStore.commitDetailFullscreen = false; }}>
-        <i class="codicon codicon-close"></i>
-      </button>
+      {#if !uiStore.alwaysShowCommitDetails}
+        <button class="tab-action-btn" aria-label={t('common.close')} use:tooltip={t('common.close')} onclick={() => { if (!uiStore.multiSelectArmed) { uiStore.selectCommit(null); } uiStore.showBottomPanel = false; uiStore.commitDetailFullscreen = false; }}>
+          <i class="codicon codicon-close"></i>
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -1348,11 +1358,12 @@
 
   .info-columns {
     display: flex;
+    flex-wrap: wrap;
     gap: 20px;
   }
 
   .info-column {
-    flex: 1;
+    flex: 1 1 240px;
     min-width: 0;
   }
 

@@ -7,12 +7,34 @@ beforeEach(() => {
   uiStore.comparing = false;
   uiStore.compareRef1 = null;
   uiStore.compareRef2 = null;
+  uiStore.alwaysShowCommitDetails = false;
   uiStore.showBottomPanel = false;
   uiStore.errorMessage = null;
   uiStore.viewMode = 'graph';
   uiStore.selectedCommitHashes = [];
   uiStore.anchorHash = null;
   uiStore.multiSelectArmed = false;
+});
+
+describe('persistent commit details', () => {
+  it('keeps the panel visible despite hide requests while enabled', () => {
+    uiStore.alwaysShowCommitDetails = true;
+    uiStore.showBottomPanel = false;
+    expect(uiStore.showBottomPanel).toBe(true);
+    uiStore.alwaysShowCommitDetails = false;
+    expect(uiStore.showBottomPanel).toBe(false);
+  });
+
+  it('keeps the selected commit when clicked again while enabled', () => {
+    uiStore.alwaysShowCommitDetails = true;
+    uiStore.selectSingle('head');
+    uiStore.selectSingle('head');
+    expect(uiStore.selectedCommitHash).toBe('head');
+    expect(uiStore.selectedCommitHashes).toEqual(['head']);
+    uiStore.alwaysShowCommitDetails = false;
+    uiStore.selectSingle('head');
+    expect(uiStore.selectedCommitHash).toBeNull();
+  });
 });
 
 describe('uiStore.selectCommit', () => {

@@ -63,6 +63,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   let remoteFilter = $state<string[]>([]);
   let branchFilter = $state<string[]>([]);
   let resizing = $state(false);
+  let graphLayout: HTMLDivElement | undefined = $state();
   let conflict = $state<{ operation: string; files: Array<{ path: string; resolved: boolean }> } | null>(null);
   let rebasePaused = $state(false);
   let showAbortConfirmModal = $state(false);
@@ -102,9 +103,17 @@ import AmendModal from './components/modals/AmendModal.svelte';
     }
   }
 
+  $effect(() => {
+    if (!uiStore.alwaysShowCommitDetails || commitStore.loading || commitStore.notGitRepo || uiStore.multiSelectArmed || uiStore.comparing) return;
+    if (uiStore.selectedCommitHash && commitStore.getCommit(uiStore.selectedCommitHash)) return;
+    const hash = commitStore.headHash ?? commitStore.commits.find(commit => commit.hash !== 'UNCOMMITTED')?.hash ?? null;
+    if (uiStore.selectedCommitHash !== hash) uiStore.selectCommit(hash);
+  });
+
   onMount(() => {
     const stopWatchingAvatarTheme = avatarStore.watchTheme();
     uiStore.bottomPanelHeight = Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO);
+    uiStore.rightPanelWidth = Math.round(window.innerWidth * 0.4);
 
     function handleMessage(event: MessageEvent) {
       const msg = event.data;
@@ -141,6 +150,13 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setInteractiveRebaseMode':
           uiStore.interactiveRebaseMode = msg.payload.mode;
           break;
+        case 'setAlwaysShowCommitDetails':
+          uiStore.alwaysShowCommitDetails = msg.payload.enabled;
+          break;
+        case 'setCommitDetailsPosition':
+          resizeCleanup?.();
+          uiStore.commitDetailsPosition = msg.payload.position;
+          break;
         case 'setDefaultCommitTab':
           uiStore.defaultCommitTab = msg.payload.tab;
           break;
@@ -166,6 +182,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
           avatarStore.receive(msg.payload.email, msg.payload.size, msg.payload.dataUri);
           break;
         case 'repoList':
+          if (uiStore.alwaysShowCommitDetails && uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) {
+            uiStore.selectCommit(null);
+            commitStore.setLoading(true);
+          }
           uiStore.repos = msg.payload.repos;
           uiStore.activeRepo = msg.payload.active;
           commitStore.notGitRepo = false;
@@ -319,7 +339,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
       e.preventDefault();
       if (uiStore.commitDetailFullscreen) {
         uiStore.commitDetailFullscreen = false;
-      } else {
+      } else if (!uiStore.alwaysShowCommitDetails) {
         // selectCommit(null) clears the whole selection (incl. selectedCommitHashes
         // and compare state) so the row highlight is fully removed.
         uiStore.selectCommit(null);
@@ -378,14 +398,24 @@ import AmendModal from './components/modals/AmendModal.svelte';
   let resizeCleanup: (() => void) | null = null;
 
   function startResize(e: MouseEvent) {
+    if (e.button !== 0) return;
     e.preventDefault();
+    resizeCleanup?.();
     resizing = true;
-    const startY = e.clientY;
-    const startHeight = uiStore.bottomPanelHeight;
+    const right = uiStore.commitDetailsPosition === 'right';
+    const start = right ? e.clientX : e.clientY;
+    const startSize = right
+      ? Math.min(uiStore.rightPanelWidth, (graphLayout?.clientWidth ?? window.innerWidth) * 0.7)
+      : uiStore.bottomPanelHeight;
 
     function onMouseMove(e: MouseEvent) {
-      const delta = startY - e.clientY;
-      uiStore.bottomPanelHeight = Math.max(window.innerHeight * BOTTOM_PANEL_MIN_RATIO, Math.min(window.innerHeight * BOTTOM_PANEL_MAX_RATIO, startHeight + delta));
+      const delta = start - (right ? e.clientX : e.clientY);
+      if (right) {
+        const available = graphLayout?.clientWidth ?? window.innerWidth;
+        uiStore.rightPanelWidth = Math.max(Math.min(240, available * 0.5), Math.min(available * 0.7, startSize + delta));
+      } else {
+        uiStore.bottomPanelHeight = Math.max(window.innerHeight * BOTTOM_PANEL_MIN_RATIO, Math.min(window.innerHeight * BOTTOM_PANEL_MAX_RATIO, startSize + delta));
+      }
     }
 
     function onMouseUp() {
@@ -403,7 +433,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   onDestroy(() => { resizeCleanup?.(); });
 </script>
 
-<div class="app-container" class:resizing>
+<div class="app-container" class:resizing class:details-right={uiStore.commitDetailsPosition === 'right'}>
   <Toolbar onRefresh={() => {
     commitStore.setLoading(true);
     vscode.postMessage({ type: 'getLog', payload: {
@@ -522,26 +552,29 @@ import AmendModal from './components/modals/AmendModal.svelte';
           }}
         />
       {/if}
-      {#if !uiStore.commitDetailFullscreen}
-        <div class="graph-area">
-          <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} onHeadOffscreenChange={(v) => headOffscreen = v} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
-        </div>
-      {/if}
-      {#if uiStore.showBottomPanel && (uiStore.selectedCommitHash || uiStore.comparing)}
+      <div class="graph-layout" bind:this={graphLayout}>
         {#if !uiStore.commitDetailFullscreen}
-          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <div
-            class="resize-handle-h"
-            role="separator"
-            onmousedown={startResize}
-          >
-            <div class="resize-handle-line"></div>
+          <div class="graph-area">
+            <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} onHeadOffscreenChange={(v) => headOffscreen = v} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
           </div>
         {/if}
-        <div class="bottom-area" class:fullscreen={uiStore.commitDetailFullscreen} style={uiStore.commitDetailFullscreen ? '' : `height: ${uiStore.bottomPanelHeight}px;`}>
-          <BottomPanel />
-        </div>
-      {/if}
+        {#if uiStore.showBottomPanel && (uiStore.alwaysShowCommitDetails || uiStore.selectedCommitHash || uiStore.comparing)}
+          {#if !uiStore.commitDetailFullscreen}
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <div
+              class="resize-handle-h"
+              role="separator"
+              aria-orientation={uiStore.commitDetailsPosition === 'right' ? 'vertical' : 'horizontal'}
+              onmousedown={startResize}
+            >
+              <div class="resize-handle-line"></div>
+            </div>
+          {/if}
+          <div class="bottom-area" class:fullscreen={uiStore.commitDetailFullscreen} style={uiStore.commitDetailFullscreen ? '' : uiStore.commitDetailsPosition === 'right' ? `width: ${uiStore.rightPanelWidth}px;` : `height: ${uiStore.bottomPanelHeight}px;`}>
+            <BottomPanel />
+          </div>
+        {/if}
+      </div>
     {:else if uiStore.viewMode === 'log'}
       <div class="log-container">
         <Reflog active={uiStore.viewMode === 'log'} />
@@ -1110,8 +1143,22 @@ import AmendModal from './components/modals/AmendModal.svelte';
     overflow: hidden;
   }
 
+  .graph-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .details-right .graph-layout {
+    flex-direction: row;
+  }
+
   .graph-area {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
   }
@@ -1143,6 +1190,26 @@ import AmendModal from './components/modals/AmendModal.svelte';
   .resize-handle-h:hover .resize-handle-line {
     background: var(--vscode-focusBorder, #007fd4);
     width: 120px;
+  }
+
+  .details-right.resizing, .details-right .resize-handle-h {
+    cursor: ew-resize;
+  }
+
+  .details-right .resize-handle-h {
+    width: 12px;
+    height: auto;
+  }
+
+  .details-right .resize-handle-line {
+    width: 4px;
+    height: 80px;
+    transition: background 0.15s, height 0.15s;
+  }
+
+  .details-right .resize-handle-h:hover .resize-handle-line {
+    width: 4px;
+    height: 120px;
   }
 
   /* ---- Light theme overrides ---- */
@@ -1178,6 +1245,19 @@ import AmendModal from './components/modals/AmendModal.svelte';
        BottomPanel then scrolls internally instead of becoming unreachable. */
     max-height: 80%;
     border-top: 1px solid var(--border-color);
+  }
+
+  .details-right .bottom-area {
+    height: 100%;
+    max-height: none;
+    max-width: 70%;
+    border-top: none;
+    border-left: 1px solid var(--border-color);
+  }
+
+  .details-right .bottom-area.fullscreen {
+    max-width: none;
+    border-left: none;
   }
 
   .bottom-area.fullscreen {

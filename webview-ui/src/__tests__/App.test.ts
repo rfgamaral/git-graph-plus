@@ -6,6 +6,7 @@ import { commitStore } from '../lib/stores/commits.svelte';
 import { branchStore } from '../lib/stores/branches.svelte';
 import { uiStore } from '../lib/stores/ui.svelte';
 import { modalStore } from '../lib/stores/modals.svelte';
+import type { Commit } from '../lib/types';
 
 function postMsg(type: string, payload?: unknown) {
   window.dispatchEvent(new MessageEvent('message', { data: { type, payload } }));
@@ -21,7 +22,9 @@ function resetStores() {
   branchStore.stashes = [];
   branchStore.worktrees = [];
   uiStore.viewMode = 'graph';
-  uiStore.selectedCommitHash = null;
+  uiStore.selectCommit(null);
+  uiStore.alwaysShowCommitDetails = false;
+  uiStore.commitDetailsPosition = 'bottom';
   uiStore.comparing = false;
   uiStore.commitDetailFullscreen = false;
   uiStore.showBottomPanel = true;
@@ -204,6 +207,115 @@ describe('App — message handling', () => {
     await waitFor(() => {
       expect(container.querySelector('.search-input')).toBeNull();
     });
+  });
+});
+
+describe('App — commit details settings', () => {
+  const commit = (hash: string, head = false): Commit => ({
+    hash, abbreviatedHash: hash.slice(0, 7), subject: hash, body: '', parents: [],
+    author: { name: 'A', email: 'a@x.com', date: '' },
+    committer: { name: 'A', email: 'a@x.com', date: '' },
+    refs: head ? [{ name: 'HEAD', type: 'head' }] : [],
+  });
+
+  it('does not select a commit or open details when always-visible mode is disabled', async () => {
+    const { container } = render(App);
+    postMsg('logData', { commits: [commit('head', true)], graph: [], hasMore: false });
+    await waitFor(() => expect(commitStore.headHash).toBe('head'));
+    expect(uiStore.selectedCommitHash).toBeNull();
+    expect(container.querySelector('.bottom-area')).toBeNull();
+  });
+
+  it('selects HEAD and keeps its details open on Escape', async () => {
+    const { container } = render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    postMsg('logData', { commits: [commit('newer'), commit('head', true)], graph: [], hasMore: false });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('head'));
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(uiStore.selectedCommitHash).toBe('head');
+    expect(container.querySelector('.bottom-area')).not.toBeNull();
+    expect(globalThis.__postedMessages.some(m => {
+      const message = m.data as { type: string; payload?: { hash: string } };
+      return message.type === 'getCommitDiff' && message.payload?.hash === 'head';
+    })).toBe(true);
+  });
+
+  it('selects the first real commit when HEAD is absent, skipping uncommitted changes', async () => {
+    render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    postMsg('logData', { commits: [commit('UNCOMMITTED'), commit('first'), commit('older')], graph: [], hasMore: false });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('first'));
+  });
+
+  it('preserves a valid selection on refresh and keeps the pane visible when the log becomes empty', async () => {
+    const { container } = render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    postMsg('logData', { commits: [commit('head', true), commit('older')], graph: [], hasMore: false });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('head'));
+    uiStore.selectCommit('older');
+    postMsg('fullRefresh', {
+      logData: { commits: [commit('new-head', true), commit('older')], graph: [], hasMore: false },
+      branchData: { branches: [], tags: [], remotes: [], stashes: [], worktrees: [] },
+    });
+    await waitFor(() => expect(commitStore.headHash).toBe('new-head'));
+    expect(uiStore.selectedCommitHash).toBe('older');
+    postMsg('logData', { commits: [], graph: [], hasMore: false });
+    await waitFor(() => {
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(container.querySelector('.bottom-panel .empty')).not.toBeNull();
+    });
+    postMsg('setAlwaysShowCommitDetails', { enabled: false });
+    await waitFor(() => expect(container.querySelector('.bottom-area')).toBeNull());
+  });
+
+  it('waits for the new repository log and selects its HEAD even when the old selection still exists', async () => {
+    render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    postMsg('repoList', { repos: [], active: '/repo-a' });
+    postMsg('logData', { commits: [commit('shared', true)], graph: [], hasMore: false });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('shared'));
+    postMsg('repoList', { repos: [], active: '/repo-b' });
+    await waitFor(() => {
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(commitStore.loading).toBe(true);
+    });
+    postMsg('logData', { commits: [commit('shared'), commit('new-head', true)], graph: [], hasMore: false });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('new-head'));
+  });
+
+  it('renders both layouts and retains their independent resize dimensions', async () => {
+    const { container, getByRole } = render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    postMsg('logData', { commits: [commit('head', true)], graph: [], hasMore: false });
+    await waitFor(() => expect(container.querySelector('.bottom-area')).not.toBeNull());
+    const area = container.querySelector<HTMLDivElement>('.bottom-area')!;
+    const handle = container.querySelector<HTMLDivElement>('.resize-handle-h')!;
+    const initialHeight = uiStore.bottomPanelHeight;
+    const initialWidth = uiStore.rightPanelWidth;
+    expect(handle.getAttribute('aria-orientation')).toBe('horizontal');
+    await fireEvent.mouseDown(handle, { button: 0, clientY: 500 });
+    await fireEvent.mouseMove(window, { clientY: 450 });
+    await fireEvent.mouseUp(window);
+    expect(uiStore.bottomPanelHeight).toBe(initialHeight + 50);
+    expect(area.style.height).toBe(`${initialHeight + 50}px`);
+    expect(uiStore.rightPanelWidth).toBe(initialWidth);
+    await fireEvent.click(getByRole('button', { name: 'Move details to right' }));
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'setCommitDetailsPosition', payload: { position: 'right' },
+    });
+    Object.defineProperty(container.querySelector('.graph-layout')!, 'clientWidth', { configurable: true, value: 1000 });
+    postMsg('setCommitDetailsPosition', { position: 'right' });
+    await waitFor(() => expect(handle.getAttribute('aria-orientation')).toBe('vertical'));
+    expect(container.querySelector('.app-container.details-right')).not.toBeNull();
+    await fireEvent.mouseDown(handle, { button: 0, clientX: 600 });
+    await fireEvent.mouseMove(window, { clientX: 550 });
+    await fireEvent.mouseUp(window);
+    expect(uiStore.rightPanelWidth).toBe(initialWidth + 50);
+    expect(area.style.width).toBe(`${initialWidth + 50}px`);
+    expect(uiStore.bottomPanelHeight).toBe(initialHeight + 50);
+    postMsg('setCommitDetailsPosition', { position: 'bottom' });
+    await waitFor(() => expect(area.style.height).toBe(`${initialHeight + 50}px`));
+    expect(area.style.width).toBe('');
   });
 });
 

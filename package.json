@@ -545,6 +545,19 @@
           "default": true,
           "markdownDescription": "Fetch LFS file-lock status from the remote so locked files are marked in the file tree. Disable this when the repository's remote has no LFS lock server (e.g. some on-premise hosts) to stop background `git lfs locks` requests and the error popups they produce."
         },
+        "gitGraphPlus.alwaysShowCommitDetails": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Keep the commit details panel always visible."
+        },
+        "gitGraphPlus.commitDetailsPosition": {
+          "type": "string",
+          "enum": ["bottom", "right"],
+          "default": "bottom",
+          "scope": "application",
+          "description": "Where to show the commit details panel relative to the graph."
+        },
         "gitGraphPlus.defaultCommitTab": {
           "type": "string",
           "enum": [
