@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.0](https://github.com/rfgamaral/git-graph-plus/compare/v0.7.3...v0.8.0) (2026-09-10)
+
+
+### Bug Fixes
+
+* **branches:** drop the detached-HEAD pseudo-branch ([0522b59](https://github.com/rfgamaral/git-graph-plus/commit/0522b5962d186e57836e96c86b42dc8b8414aae2)), closes [#65](https://github.com/the0807/git-graph-plus/issues/65)
+* **changes:** compact single-child folders ([3e94cef](https://github.com/rfgamaral/git-graph-plus/commit/3e94cef5d58489ca9f02f1e895854bc3340a24c9))
+* **details:** clear a stale commit selection after refresh ([f4280a6](https://github.com/rfgamaral/git-graph-plus/commit/f4280a6a02876371af7c4363baebf17f8a1bb583)), closes [#74](https://github.com/the0807/git-graph-plus/issues/74)
+* **graph:** hide stashes until their base commit is loaded ([#52](https://github.com/the0807/git-graph-plus/issues/52)) ([c6c2a9a](https://github.com/rfgamaral/git-graph-plus/commit/c6c2a9a4d5b295a0f32ef5899d2c6972c5f0d3e7))
+* **graph:** keep the search bar visible during a conflict ([1cf557a](https://github.com/rfgamaral/git-graph-plus/commit/1cf557a11b32b79f63ac3e65e8dd9f77630ca490)), closes [#69](https://github.com/the0807/git-graph-plus/issues/69)
+* **log:** include detached HEAD as a walk start point ([bd69572](https://github.com/rfgamaral/git-graph-plus/commit/bd69572303a117742f23144c8c18659f6ded4a17)), closes [#63](https://github.com/the0807/git-graph-plus/issues/63)
+* **markdown:** decode escaped display text ([d116796](https://github.com/rfgamaral/git-graph-plus/commit/d116796b69fb2142b92039e0b28af2532d13cfea))
+* **markdown:** render inline code entities correctly ([b224118](https://github.com/rfgamaral/git-graph-plus/commit/b2241187771a8e230c3036ef04f3c0da0e12247f))
+* **rebase:** autosquash amend! commits like git does ([3572ac8](https://github.com/rfgamaral/git-graph-plus/commit/3572ac85a56e0c9dae8893e43ba5783528a314b6)), closes [#62](https://github.com/the0807/git-graph-plus/issues/62)
+* **watcher:** stop endless refresh inside a linked worktree ([27ea27a](https://github.com/rfgamaral/git-graph-plus/commit/27ea27ac7e8d587da71416d345099859b4374d0f))
+
+
+### Features
+
+* **avatar:** resolve GitHub noreply emails and support per-email overrides ([f8793ed](https://github.com/rfgamaral/git-graph-plus/commit/f8793ed4c61c04c927694ca3fdbf9f5f226575b9))
+* **details:** add gitGraphPlus.defaultCommitTab setting ([f8cc32b](https://github.com/rfgamaral/git-graph-plus/commit/f8cc32b39e94df81481bee5557aba5fcb08bb1fb)), closes [#72](https://github.com/the0807/git-graph-plus/issues/72)
+* **details:** configurable date/time format ([06c2400](https://github.com/rfgamaral/git-graph-plus/commit/06c240041f060b212bf428c1ece1708fbf431ef5))
+* **details:** focus the graph on a commit referenced from the details panel ([3df33f7](https://github.com/rfgamaral/git-graph-plus/commit/3df33f765e68ff6800cbbf53e6cd2febd8b46424))
+* **details:** relative day names for today/yesterday ([f11f0c6](https://github.com/rfgamaral/git-graph-plus/commit/f11f0c600a05aa78684ca1f472141b354c8a49e9))
+* **lfs:** add gitGraphPlus.fetchLfsLocks setting ([40981ba](https://github.com/rfgamaral/git-graph-plus/commit/40981ba251cbfd65c677ebad06bc3b6ec2b35649)), closes [#70](https://github.com/the0807/git-graph-plus/issues/70)
+
 ## 0.7.3 (2026-06-30)
 
 ### Bug Fixes

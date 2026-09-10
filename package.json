@@ -2,7 +2,7 @@
   "name": "git-graph-plus",
   "displayName": "Git Graph+",
   "description": "A modern and full-featured Git visualization tool for an intuitive Git experience in VS Code.",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "publisher": "rfgamaral",
   "repository": {
     "type": "git",
