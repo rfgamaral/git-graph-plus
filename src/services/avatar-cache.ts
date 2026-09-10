@@ -3,9 +3,6 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 
-/** Fetches the raw bytes for an avatar URL. Returns null on any failure so the
- *  cache can degrade gracefully (the webview falls back to no avatar). Injected
- *  in tests so they never touch the network. */
 export type AvatarFetcher = (url: string) => Promise<{ data: Buffer; contentType: string } | null>;
 
 const MAX_MEMORY_ENTRIES = 500;
@@ -32,11 +29,6 @@ function normalizeEmail(email: string): string {
  *  GitHub's "keep my email private" option get exactly these addresses. */
 const GITHUB_NOREPLY_RE = /^(?:(\d+)\+)?([^@]+)@users\.noreply\.github\.com$/i;
 
-/** Returns the avatar URL for a normalized commit-author email. An explicit
- *  override wins first; then GitHub noreply emails resolve to
- *  avatars.githubusercontent.com (where the real avatar lives); everything
- *  else falls back to Gravatar, whose `d=retro` parameter generates a
- *  placeholder for emails without a Gravatar account. */
 function avatarUrlForEmail(normEmail: string, size: number, overrides: Record<string, string>): string {
   const override = overrides[normEmail];
   if (override) return override;
@@ -49,7 +41,7 @@ function avatarUrlForEmail(normEmail: string, size: number, overrides: Record<st
       : `https://avatars.githubusercontent.com/${login}?s=${size}`;
   }
   const hash = md5(normEmail);
-  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=retro`;
+  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=404`;
 }
 
 /** Caches commit-author avatars in the extension host (memory + disk) and
@@ -98,7 +90,7 @@ export class AvatarCache {
 
   private async load(key: string, normEmail: string, size: number): Promise<string | null> {
     const hash = md5(normEmail);
-    const diskFile = this.cacheDir ? path.join(this.cacheDir, `${hash}-${size}`) : null;
+    const diskFile = this.cacheDir ? path.join(this.cacheDir, `${hash}-${size}-v2`) : null;
 
     // Disk hit. Serve it if still within the TTL; otherwise keep it as a
     // fallback and try to refresh from the network below.

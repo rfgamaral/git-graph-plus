@@ -103,6 +103,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   }
 
   onMount(() => {
+    const stopWatchingAvatarTheme = avatarStore.watchTheme();
     uiStore.bottomPanelHeight = Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO);
 
     function handleMessage(event: MessageEvent) {
@@ -273,6 +274,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
     // Keyboard shortcuts
     window.addEventListener('keydown', handleGlobalKeydown);
     return () => {
+      stopWatchingAvatarTheme();
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('keydown', handleGlobalKeydown);
       document.removeEventListener('visibilitychange', handleVisibility);

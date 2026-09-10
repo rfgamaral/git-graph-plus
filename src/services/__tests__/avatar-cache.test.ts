@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'fs';
+import { createHash } from 'crypto';
 import * as os from 'os';
 import * as path from 'path';
 import { AvatarCache, type AvatarFetcher } from '../avatar-cache';
@@ -78,6 +79,7 @@ describe('AvatarCache', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain('https://www.gravatar.com/avatar/');
     expect(calls[0]).toContain('s=32');
+    expect(new URL(calls[0]).searchParams.get('d')).toBe('404');
   });
 
   it('uses an explicit override URL for a matching email', async () => {
@@ -139,6 +141,15 @@ describe('AvatarCache', () => {
 
     expect(a).toBe(b);
     expect(calls).toHaveLength(1);
+  });
+
+  it('ignores legacy cached images that may contain the retro placeholder', async () => {
+    const hash = createHash('md5').update('alice@example.com').digest('hex');
+    await fs.writeFile(path.join(tmpDir, `${hash}-32`), 'data:image/png;base64,bGVnYWN5');
+    const fetcher = vi.fn(async () => null);
+    const cache = new AvatarCache(tmpDir, fetcher);
+    expect(await cache.get('alice@example.com', 32)).toBeNull();
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it('persists to disk so a fresh instance avoids the network', async () => {

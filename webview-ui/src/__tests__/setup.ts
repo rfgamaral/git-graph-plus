@@ -53,8 +53,18 @@ if (typeof Element !== 'undefined' && typeof Element.prototype.animate !== 'func
 // previous file's setup. Use `globalThis` rather than module-scope so the
 // helper survives the cross-file boundary vitest puts between tests.
 import { beforeEach } from 'vitest';
+
+function setThemeColors() {
+  const colors = { blue: '#3794ff', green: '#89d185', yellow: '#cca700', orange: '#d18616', purple: '#b180d7' };
+  for (const [name, color] of Object.entries(colors)) {
+    document.body.style.setProperty(`--vscode-charts-${name}`, color);
+  }
+}
+
+setThemeColors();
 beforeEach(() => {
   globalThis.__postedMessages = [];
+  setThemeColors();
 });
 
 export {};

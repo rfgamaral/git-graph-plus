@@ -12,6 +12,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "boring-avatars-vanilla": "1.0.2",
     "marked": "^12.0.2",
     "shiki": "^1.0.0"
   },
