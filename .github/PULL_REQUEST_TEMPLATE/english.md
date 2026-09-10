@@ -52,8 +52,8 @@ If this PR includes UI changes, please attach before/after screenshots.
 ## 7. Checklist
 
 - [ ] New message types are defined in `message-bus.ts` (if applicable)
-- [ ] UI strings are added to both `en.ts` and `ko.ts` (if applicable)
-- [ ] Extension-side strings are added to both `l10n/bundle.l10n.json` and `bundle.l10n.ko.json` (if applicable)
+- [ ] UI strings are added to `en.ts` (if applicable)
+- [ ] Extension-side strings are added to `l10n/bundle.l10n.json` (if applicable)
 - [ ] No leftover `console.log` or debug code
 
 ## 8. Additional Context (optional)

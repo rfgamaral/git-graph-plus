@@ -385,10 +385,7 @@
           "type": "string",
           "enum": [
             "auto",
-            "en",
-            "ko",
-            "zh-cn",
-            "ru"
+            "en"
           ],
           "default": "auto",
           "description": "UI language (auto = follow VS Code language setting)"

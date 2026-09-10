@@ -4,8 +4,6 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
-[한국어](README.ko.md)
-
 A modern and full-featured Git visualization tool for an intuitive Git experience in VS Code.
 
 > Staging, committing, and inline blame use VS Code's built-in Source Control. Git Graph+ focuses on everything else.
@@ -153,7 +151,7 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 
 ### Internationalization
 
-- English (default), Korean, and Chinese Simplified
+- English only
 - Configurable via `gitGraphPlus.locale` setting
 - Git terms (commit, merge, rebase, push, pull, fetch, etc.) remain untranslated
 
@@ -183,7 +181,7 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 | `gitGraphPlus.timeout`                 | `60`          | Max time (seconds) to wait for a Git command before abort |
 | `gitGraphPlus.initialCommitCount`      | `200`         | Commits loaded on first render / refresh (lower = faster in huge repos) |
 | `gitGraphPlus.loadMoreCommitCount`     | `50`          | Extra commits fetched per **Load more commits** click    |
-| `gitGraphPlus.locale`                  | `auto`        | UI language (`auto`, `en`, `ko`, `zh-cn`)                |
+| `gitGraphPlus.locale`                  | `auto`        | UI language (`auto`, `en`; English only)                |
 | `gitGraphPlus.graphSortOrder`          | `topological` | Commit sort order (`topological`, `date`, `author-date`) |
 | `gitGraphPlus.interactiveRebase.mode`  | `ui`          | Interactive rebase mode (`ui` visual editor, `classic` `git rebase -i` in a terminal) |
 | `gitGraphPlus.showSignatureStatus`     | `true`        | Show GPG/SSH signature status in the graph               |

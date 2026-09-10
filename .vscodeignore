@@ -27,5 +27,4 @@ resources/*.png
 !resources/icon-marketplace.png
 resources/icon.svg
 resources/icon-marketplace.svg
-README.ko.md
 webview-ui/package.json
