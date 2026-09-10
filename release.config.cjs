@@ -11,7 +11,7 @@ module.exports = {
       message: 'chore(release): ${nextRelease.version} [skip ci]',
     }],
     ['@semantic-release/github', {
-      assets: [{ path: 'git-graph-plus-*.vsix', label: 'Git Graph+ VSIX' }],
+      assets: [{ path: 'git-graph-plus-*.vsix' }],
       successComment: false,
       failComment: false,
       failTitle: false,
