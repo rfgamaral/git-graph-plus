@@ -203,8 +203,8 @@ class BranchLeafItem extends vscode.TreeItem {
     this.tooltip = `${branch.name}\n${trackingStatus}`;
 
     this.command = {
-      command: 'gitGraphPlus.showBranchMenu',
-      title: 'Show Branch Menu',
+      command: 'gitGraphPlus.showBranch',
+      title: 'Show Branch in Git Graph',
       arguments: [{ branch: this.branch }],
     };
   }

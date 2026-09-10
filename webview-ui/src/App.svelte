@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import { getVsCodeApi } from './lib/vscode-api';
   import { commitStore } from './lib/stores/commits.svelte';
@@ -110,6 +110,42 @@ import AmendModal from './components/modals/AmendModal.svelte';
     if (uiStore.selectedCommitHash !== hash) uiStore.selectCommit(hash);
   });
 
+  let pendingBranch = $state<string | null>(null);
+
+  $effect(() => {
+    const name = pendingBranch;
+    if (!name || commitStore.loading || commitStore.loadingMore || commitStore.notGitRepo) return;
+    if (remoteFilter.length || branchFilter.length) {
+      remoteFilter = [];
+      branchFilter = [];
+      commitStore.setLoading(true);
+      vscode.postMessage({ type: 'getLog', payload: {
+        limit: commitStore.currentLimit || undefined,
+        branches: [],
+        remoteFilter: [],
+      }});
+      return;
+    }
+    const commit = commitStore.commits.find(c => c.refs.some(r => (r.type === 'branch' || r.type === 'head') && r.name === name));
+    if (commit) {
+      void tick().then(() => {
+        if (pendingBranch !== name) return;
+        pendingBranch = null;
+        uiStore.selectCommit(commit.hash);
+        uiStore.focusCommit(commit.hash);
+      });
+    } else if (commitStore.hasMore) {
+      commitStore.setLoadingMore(true);
+      vscode.postMessage({ type: 'getLog', payload: {
+        limit: Math.max(commitStore.currentLimit * 2, commitStore.currentLimit + uiStore.loadMoreCount),
+        branches: [],
+        remoteFilter: [],
+      }});
+    } else {
+      pendingBranch = null;
+    }
+  });
+
   onMount(() => {
     const stopWatchingAvatarTheme = avatarStore.watchTheme();
     uiStore.bottomPanelHeight = Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO);
@@ -118,6 +154,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
     function handleMessage(event: MessageEvent) {
       const msg = event.data;
       switch (msg.type) {
+        case 'showBranch':
+          uiStore.viewMode = 'graph';
+          pendingBranch = msg.payload.name;
+          break;
         case 'logData':
           if (msg.payload.remoteFilter !== undefined) remoteFilter = msg.payload.remoteFilter;
           if (msg.payload.branches !== undefined) branchFilter = msg.payload.branches;
@@ -182,6 +222,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
           avatarStore.receive(msg.payload.email, msg.payload.size, msg.payload.dataUri);
           break;
         case 'repoList':
+          if (uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) pendingBranch = null;
           if (uiStore.alwaysShowCommitDetails && uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) {
             uiStore.selectCommit(null);
             commitStore.setLoading(true);
@@ -201,6 +242,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
           commitStore.setLoading(false);
           break;
         case 'error':
+          if (msg.payload.source === 'getLog' && pendingBranch) {
+            pendingBranch = null;
+            commitStore.setLoadingMore(false);
+          }
           uiStore.setError(msg.payload.message);
           commitStore.setLoading(false);
           // Close only the modal that originated the failing operation. An

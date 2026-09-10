@@ -514,24 +514,9 @@ export function activate(context: vscode.ExtensionContext) {
         });
       }
     }),
-    vscode.commands.registerCommand('gitGraphPlus.showBranchMenu', (branchItem) => {
+    vscode.commands.registerCommand('gitGraphPlus.showBranch', (branchItem) => {
       const branch = branchItem?.branch;
-      if (branch) {
-        vscode.window.showQuickPick([
-          { label: `Checkout ${branch.name}`, id: 'checkout' },
-          { label: `Merge into current branch...`, id: 'merge' },
-          { label: `Rename ${branch.name}...`, id: 'rename' },
-          { label: `Delete ${branch.name}...`, id: 'delete' },
-        ]).then(selected => {
-          if (!selected) return;
-          switch (selected.id) {
-            case 'checkout': vscode.commands.executeCommand('gitGraphPlus.checkoutBranch', branchItem); break;
-            case 'merge': vscode.commands.executeCommand('gitGraphPlus.mergeBranch', branchItem); break;
-            case 'rename': vscode.commands.executeCommand('gitGraphPlus.renameBranch', branchItem); break;
-            case 'delete': vscode.commands.executeCommand('gitGraphPlus.deleteBranch', branchItem); break;
-          }
-        });
-      }
+      if (branch) return MainPanel.showBranchWithPanel(context.extensionUri, activeGitService.rootPath, branch.name);
     }),
     vscode.commands.registerCommand('gitGraphPlus.showTagMenu', (tagItem) => {
       const tag = tagItem?.tag;

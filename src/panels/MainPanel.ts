@@ -409,6 +409,25 @@ export class MainPanel {
     this.post({ type: 'showModal', payload });
   }
 
+  private pendingBranch: string | null = null;
+  private webviewReady = false;
+
+  public static async showBranchWithPanel(extensionUri: vscode.Uri, repoPath: string, name: string): Promise<void> {
+    if (!MainPanel.currentPanel) MainPanel.createOrShow(extensionUri, repoPath);
+    const panel = MainPanel.currentPanel;
+    if (!panel) return;
+    await panel.switchRepo(repoPath);
+    panel.panel.reveal();
+    panel.pendingBranch = name;
+    if (panel.webviewReady) panel.processPendingBranch();
+  }
+
+  private processPendingBranch(): void {
+    if (!this.pendingBranch) return;
+    this.post({ type: 'showBranch', payload: { name: this.pendingBranch } });
+    this.pendingBranch = null;
+  }
+
   private static pendingModal: { modal: string; [key: string]: any } | null = null;
 
   public static showModalWithPanel(extensionUri: vscode.Uri, payload: { modal: string; [key: string]: any }): void {
@@ -527,6 +546,8 @@ export class MainPanel {
             type: 'branchData',
             payload: { branches, tags, remotes, stashes, worktrees },
           });
+          this.webviewReady = true;
+          this.processPendingBranch();
           this.processPendingModal();
           break;
         }

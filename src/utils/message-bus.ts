@@ -136,6 +136,7 @@ export type WebviewMessage =
 
 // Messages from Extension → Webview
 export type ExtensionMessage =
+  | { type: 'showBranch'; payload: { name: string } }
   | { type: 'setAlwaysShowCommitDetails'; payload: { enabled: boolean } }
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
   | { type: 'authorColors'; payload: { colors: Record<string, string> } }
