@@ -636,7 +636,7 @@
     background: var(--vscode-menu-background, #252526);
     border: 1px solid var(--vscode-menu-border, #454545);
     border-radius: 6px;
-    padding: 4px 0;
+    padding: 4px;
     min-width: 190px;
     z-index: 100;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);

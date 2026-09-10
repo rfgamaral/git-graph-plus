@@ -159,7 +159,7 @@
     background: var(--vscode-menu-background, var(--bg-secondary));
     border: 1px solid var(--vscode-menu-border, var(--border-color));
     border-radius: 4px;
-    padding: 4px 0;
+    padding: 4px;
     min-width: 280px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     font-size: var(--vscode-font-size, 13px);
@@ -237,7 +237,7 @@
     background: var(--vscode-menu-background, var(--bg-secondary));
     border: 1px solid var(--vscode-menu-border, var(--border-color));
     border-radius: 4px;
-    padding: 4px 0;
+    padding: 4px;
     min-width: 180px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     z-index: 1001;
