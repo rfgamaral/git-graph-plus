@@ -2051,7 +2051,7 @@
     border-right: 1px solid var(--border-color);
     border-radius: 0;
     background: transparent;
-    cursor: col-resize;
+    cursor: ew-resize;
     touch-action: none;
   }
 

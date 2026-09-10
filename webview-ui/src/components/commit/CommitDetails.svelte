@@ -222,7 +222,7 @@
     document.addEventListener('mousemove', onResizeMove);
     document.addEventListener('mouseup', stopResize);
     document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = 'ew-resize';
   }
 
   function onResizeMove(e: MouseEvent) {
@@ -1626,7 +1626,7 @@
   .resize-handle {
     width: 4px;
     flex-shrink: 0;
-    cursor: col-resize;
+    cursor: ew-resize;
     background: transparent;
     border-right: 1px solid var(--border-color);
     transition: background 0.15s;
