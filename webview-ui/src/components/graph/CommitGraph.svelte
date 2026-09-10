@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { commitStore } from '../../lib/stores/commits.svelte';
   import { branchStore } from '../../lib/stores/branches.svelte';
   import { uiStore } from '../../lib/stores/ui.svelte';
@@ -372,19 +372,122 @@
   let navPath = $state<string[]>([]);
   let viewportWidth = $state(800);
 
-  // Right-side columns (author + sha + date) and the minimum width we always
-  // reserve for the commit message. These mirror the fixed column widths in the
-  // CSS below.
-  const RIGHT_COLS_WIDTH = 120 + 75 + 150;
   const MIN_MESSAGE_WIDTH = 120;
+  const MIN_COLUMN_WIDTHS = [70, 55, 70];
+  let preferredWidths = $state([120, 75, 150]);
+  let fittedWidths = $state([120, 75, 150]);
+  let columnRequest: string | null = null;
+  let resize: { index: number; x: number; widths: number[]; repo: string } | null = null;
+  const minimumScale = $derived(Math.min(1, viewportWidth / (MIN_MESSAGE_WIDTH + 195)));
+  const minimumWidths = $derived(MIN_COLUMN_WIDTHS.map(w => w * minimumScale));
+  const columnWidths = $derived.by(() => {
+    const widths = (uiStore.autoFitColumns ? fittedWidths : preferredWidths).map((w, i) => Math.max(minimumWidths[i], w));
+    const budget = Math.max(0, viewportWidth - MIN_MESSAGE_WIDTH * minimumScale);
+    const extra = widths.reduce((sum, w, i) => sum + w - minimumWidths[i], 0);
+    const scale = extra > 0 ? Math.min(1, Math.max(0, budget - 195 * minimumScale) / extra) : 0;
+    return widths.map((w, i) => minimumWidths[i] + (w - minimumWidths[i]) * scale);
+  });
+  const descriptionWidth = $derived(Math.max(0, viewportWidth - columnWidths.reduce((a, b) => a + b, 0)));
+  const maxGraphWidth = $derived(Math.max(0, descriptionWidth - Math.min(MIN_MESSAGE_WIDTH, descriptionWidth * 0.6)));
 
-  // In huge repos (e.g. nixpkgs) hundreds of concurrent branches make the graph
-  // grow wider than the whole viewport, which would push the commit message off
-  // screen and break column alignment. Cap the graph at whatever space is left
-  // after the message + right columns; lanes beyond the cap are clipped.
-  let maxGraphWidth = $derived(
-    Math.max(120, viewportWidth - RIGHT_COLS_WIDTH - MIN_MESSAGE_WIDTH)
-  );
+  $effect(() => {
+    const repo = uiStore.activeRepo;
+    preferredWidths = [120, 75, 150];
+    resize = null;
+    contextMenu = null;
+    const requestId = crypto.randomUUID();
+    columnRequest = requestId;
+    function receiveColumns(event: MessageEvent) {
+      const msg = event.data;
+      if (msg?.type !== 'graphColumns' || msg.payload?.repo !== repo || uiStore.activeRepo !== repo || msg.payload?.requestId !== columnRequest) return;
+      const widths = msg.payload.widths;
+      if (Array.isArray(widths) && widths.length === 3 && widths.every(w => typeof w === 'number' && Number.isFinite(w) && w >= 0 && w <= 100000)) {
+        preferredWidths = widths;
+      }
+    }
+    window.addEventListener('message', receiveColumns);
+    if (repo) vscode.postMessage({ type: 'getGraphColumns', payload: { repo, requestId } });
+    return () => window.removeEventListener('message', receiveColumns);
+  });
+
+  $effect(() => {
+    if (!uiStore.autoFitColumns) return;
+    resize = null;
+    contextMenu = null;
+    if (commitStore.loading || !container) return;
+    displayCommits;
+    uiStore.dateTimeFormat;
+    t('graph.author');
+    fittedWidths = untrack(measureColumnWidths);
+  });
+
+  function saveColumns() {
+    columnRequest = null;
+    if (uiStore.activeRepo) vscode.postMessage({ type: 'saveGraphColumns', payload: { repo: uiStore.activeRepo, widths: [...preferredWidths] } });
+  }
+
+  function resizeColumn(index: number, delta: number, widths = columnWidths) {
+    const left = index === 0 ? viewportWidth - widths.reduce((a, b) => a + b, 0) : widths[index - 1];
+    const leftMinimum = index === 0 ? MIN_MESSAGE_WIDTH * minimumScale : minimumWidths[index - 1];
+    const change = Math.max(leftMinimum - left, Math.min(widths[index] - minimumWidths[index], delta));
+    preferredWidths = widths.map((w, i) => i === index ? w - change : i === index - 1 ? w + change : w);
+  }
+
+  function startResize(event: PointerEvent, index: number) {
+    if (event.button !== 0 || uiStore.autoFitColumns) return;
+    event.preventDefault();
+    columnRequest = null;
+    contextMenu = null;
+    resize = { index, x: event.clientX, widths: [...columnWidths], repo: uiStore.activeRepo };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function moveResize(event: PointerEvent) {
+    if (!uiStore.autoFitColumns && resize && resize.repo === uiStore.activeRepo) resizeColumn(resize.index, event.clientX - resize.x, resize.widths);
+  }
+
+  function finishResize() {
+    if (!resize) return;
+    if (!uiStore.autoFitColumns && resize.repo === uiStore.activeRepo) saveColumns();
+    resize = null;
+  }
+
+  function measureColumnWidths() {
+    if (!container) return [...MIN_COLUMN_WIDTHS];
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) return [...MIN_COLUMN_WIDTHS];
+    const classes = ['author', 'hash', 'date'];
+    return classes.map((name, index) => {
+      const header = container!.querySelector(`.graph-header .col-${name} .header-label`);
+      const cell = container!.querySelector(`.commit-row .col-${name}`);
+      if (!header || !cell) return MIN_COLUMN_WIDTHS[index];
+      const headerStyle = getComputedStyle(header);
+      context.font = headerStyle.font;
+      let width = context.measureText(header.textContent!.toUpperCase()).width + 20;
+      const cellStyle = getComputedStyle(cell);
+      context.font = cellStyle.font;
+      for (const commit of displayCommits) {
+        if (commit.hash === 'UNCOMMITTED') continue;
+        const text = index === 0 ? commit.author.name : index === 1 ? commit.abbreviatedHash : formatDate(commit.author.date);
+        const decorations = index === 0 ? 22 + (commit.signatureStatus && commit.signatureStatus !== 'none' ? parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0) : 0;
+        width = Math.max(width, context.measureText(text).width + decorations + 20);
+      }
+      return Math.max(MIN_COLUMN_WIDTHS[index], Math.min(100000, Math.ceil(width)));
+    });
+  }
+
+  function autoFitColumns() {
+    if (uiStore.autoFitColumns) return;
+    preferredWidths = measureColumnWidths();
+    saveColumns();
+  }
+
+  function headerContextMenu(event: MouseEvent) {
+    event.preventDefault();
+    if (uiStore.autoFitColumns) return;
+    contextMenuHash = null;
+    contextMenu = { x: event.clientX, y: event.clientY, items: [{ label: 'Auto-fit columns', action: autoFitColumns }] };
+  }
 
   // Bring a row into view when it is off-screen. 'edge' (keyboard stepping)
   // scrolls the minimum amount so the view follows the selection one row at a
@@ -470,8 +573,6 @@
 
   let totalHeight = $derived(displayCommits.length * ROW_HEIGHT);
 
-  // Full lane span, ignoring the clip cap. Used to decide whether the graph has
-  // grown wide enough to switch from clipping to horizontal scrolling.
   let naturalGraphWidth = $derived.by(() => {
     if (displayLeftMargin.length === 0) return 30;
     let maxMargin = 0;
@@ -479,24 +580,7 @@
     return Math.ceil(maxMargin * X_SCALE) + 4;
   });
 
-  // Switch to horizontal scrolling only once the graph is wide enough that the
-  // message would otherwise be squeezed below its minimum (i.e. exactly when we'd
-  // have started clipping lanes). Below that the graph fits with a usable message
-  // column, so normal mode is kept — avoids a premature scrollbar and empty space
-  // on the right when the content is narrower than the viewport.
-  let horizontalScroll = $derived(naturalGraphWidth > maxGraphWidth);
-
-  // The graph always renders at its full natural width. In normal mode that fits
-  // (we only switch to scroll mode once it would exceed maxGraphWidth), so the graph
-  // looks identical either way — only the message column and scrolling differ.
-  let graphWidth = $derived(naturalGraphWidth);
-
-  // Explicit row/header width in scroll mode so the container shows a horizontal
-  // scrollbar. Never narrower than the viewport, so rows always fill the width and
-  // the pinned meta stays flush right. 0 means "let the normal flex/100% layout decide".
-  let contentWidth = $derived(
-    horizontalScroll ? Math.max(graphWidth + MIN_MESSAGE_WIDTH + RIGHT_COLS_WIDTH, viewportWidth) : 0
-  );
+  let graphWidth = $derived(Math.min(naturalGraphWidth, maxGraphWidth));
 
   let startIndex = $derived(Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS));
   let endIndex = $derived(
@@ -569,35 +653,8 @@
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = null;
       if (!container) return;
-      const st = container.scrollTop;
-      const verticalChanged = st !== scrollTop;
-      scrollTop = st;
-      // Auto-pan horizontally only when the vertical position actually moved, so
-      // the user can still scroll horizontally on their own between vertical
-      // scrolls.
-      if (horizontalScroll && verticalChanged) autoPanHorizontal();
+      scrollTop = container.scrollTop;
     });
-  }
-
-  // In horizontal-scroll mode, keep the message start (the graph's right edge) of the
-  // commit at the vertical centre of the viewport aligned to ~1/4 from the left, so
-  // the graph sits in the left quarter and the message gets the right three-quarters.
-  // Margins are interpolated between adjacent rows so the pan follows smoothly.
-  function autoPanHorizontal() {
-    if (!container) return;
-    const centerY = scrollTop + viewportHeight / 2;
-    const f = centerY / ROW_HEIGHT - 0.5; // fractional row index (row i centred at i+0.5)
-    const last = displayCommits.length - 1;
-    if (last < 0) return;
-    const i0 = Math.max(0, Math.min(last, Math.floor(f)));
-    const i1 = Math.min(last, i0 + 1);
-    const t = Math.max(0, Math.min(1, f - i0));
-    const m0 = displayLeftMargin[i0] ?? 0;
-    const m1 = displayLeftMargin[i1] ?? 0;
-    const messageStartX = (m0 + (m1 - m0) * t) * X_SCALE + 4;
-    const maxLeft = Math.max(0, contentWidth - viewportWidth);
-    const target = Math.max(0, Math.min(messageStartX - viewportWidth / 4, maxLeft));
-    if (Math.abs(container.scrollLeft - target) > 0.5) container.scrollLeft = target;
   }
 
   function handleResize() {
@@ -1355,7 +1412,8 @@
   }
 }} />
 
-<div class="commit-graph" class:h-scroll={horizontalScroll} bind:this={container} onscroll={handleScroll}>
+<div class="commit-graph" bind:this={container} onscroll={handleScroll}
+  style="--author-width: {columnWidths[0]}px; --hash-width: {columnWidths[1]}px; --date-width: {columnWidths[2]}px; --column-padding: {10 * minimumScale}px;">
   {#if commitStore.loading && !isSearchActive}
     <div class="loading"><span class="spinner"></span> {t('graph.loading')}</div>
   {:else if commitStore.notGitRepo}
@@ -1365,8 +1423,6 @@
   {:else}
     {#if false}{/if}
 
-    <!-- Author / hash / date cells, shared by the in-row meta (normal mode) and the
-         pinned overlay (horizontal-scroll mode). -->
     {#snippet metaCells(commit: typeof displayCommits[0])}
       <div class="col-author">
         {#if commit.hash !== 'UNCOMMITTED'}
@@ -1387,19 +1443,31 @@
     {/snippet}
 
     <!-- Column headers -->
-    <div class="graph-header" style={contentWidth ? `width: ${contentWidth}px;` : ''}>
-      <div class="col-message">{t('graph.description')}</div>
-      <div class="col-meta">
-        <div class="col-author">{t('graph.author')}</div>
-        <div class="col-hash">{t('graph.sha')}</div>
-        <div class="col-date">{t('graph.date')}</div>
-      </div>
+    <div class="graph-header" role="row" tabindex="0" oncontextmenu={headerContextMenu}>
+      {#each ['message', 'author', 'hash', 'date'] as name, index}
+        <div class="col-{name}" role="columnheader">
+          <span class="header-label">{t(['graph.description', 'graph.author', 'graph.sha', 'graph.date'][index])}</span>
+          {#if index < 3 && !uiStore.autoFitColumns}
+            <button
+              class="column-resize"
+              aria-label="Resize {t(['graph.description', 'graph.author', 'graph.sha'][index])} and {t(['graph.author', 'graph.sha', 'graph.date'][index])} columns"
+              tabindex="-1"
+              title="Drag to resize"
+              onpointerdown={(event) => startResize(event, index)}
+              onpointermove={moveResize}
+              onpointerup={finishResize}
+              onpointercancel={finishResize}
+              onlostpointercapture={finishResize}
+            ></button>
+          {/if}
+        </div>
+      {/each}
     </div>
 
     <!-- Virtual scroll container -->
     <div
       class="scroll-content"
-      style="height: {totalHeight}px; position: relative;{contentWidth ? ` width: ${contentWidth}px;` : ''}"
+      style="height: {totalHeight}px; position: relative;"
       role="presentation"
       onpointermove={handleRowHover}
       onpointerleave={() => { hoveredHash = null; }}
@@ -1503,7 +1571,7 @@
               }
             }}
           >
-            <div class="col-message" style="padding-left: {(displayLeftMargin[index] ?? 0) * X_SCALE + 4}px;">
+            <div class="col-message" style="padding-left: {Math.min((displayLeftMargin[index] ?? 0) * X_SCALE + 4, maxGraphWidth)}px;">
               {#if currentBranchLocalOnly.has(commit.hash)}
                 <span class="local-dot" use:tooltip={t('graph.notPushed')}></span>
               {:else if currentBranchRemoteAhead.has(commit.hash)}
@@ -1651,54 +1719,11 @@
                   <span class="commit-subject truncate" use:tooltip={commit.subject}><LinkifiedText text={commit.subject} /></span>
                 {/if}
             </div>
-              {#if horizontalScroll}
-                <!-- Space is reserved here; the visible meta is the pinned overlay below. -->
-                <div class="col-meta-spacer" style="width: {RIGHT_COLS_WIDTH}px;"></div>
-              {:else}
-                <div class="col-meta">{@render metaCells(commit)}</div>
-              {/if}
+              <div class="col-meta">{@render metaCells(commit)}</div>
           </div>
         {/each}
       </div>
 
-      <!-- Pinned meta columns (horizontal-scroll mode). A direct child of
-           .scroll-content, so its z-index reliably sits above the graph SVG without
-           depending on descendants escaping the rows' stacking context. -->
-      {#if horizontalScroll}
-        <div
-          class="meta-overlay"
-          style="height: {totalHeight}px; width: {RIGHT_COLS_WIDTH}px;"
-        >
-          {#each visibleCommits as { commit, index } (commit.hash)}
-            <div
-              class="meta-row"
-              class:selected={uiStore.selectedCommitHashes.length > 0
-                ? uiStore.selectedCommitHashes.includes(commit.hash)
-                : uiStore.selectedCommitHash === commit.hash}
-              class:highlighted={contextMenuHash === commit.hash}
-              class:search-dim={isSearchActive && !searchMatchedHashes?.has(commit.hash)}
-              class:search-current={searchNavigateHash === commit.hash}
-              class:other-branch={!isSearchActive && !currentBranchCommits.has(commit.hash) && commit.hash !== 'UNCOMMITTED'}
-              class:compare-base={uiStore.multiSelectArmed && uiStore.selectedCommitHashes.includes(commit.hash)}
-              class:compare-active={uiStore.comparing && (uiStore.compareRef1 === commit.hash || uiStore.compareRef2 === commit.hash)}
-              class:bisect-bad={bisectBadCommit === commit.hash}
-              class:bisect-start-bad={bisectActive && bisectStartBad === commit.hash}
-              class:bisect-start-good={bisectActive && bisectStartGood === commit.hash}
-              class:bisect-culprit={bisectCulpritHash !== null && commit.hash.startsWith(bisectCulpritHash)}
-              class:hovered={hoveredHash === commit.hash}
-              style="top: {index * ROW_HEIGHT}px; height: {ROW_HEIGHT}px;"
-              role="row"
-              tabindex={-1}
-              onclick={(e) => handleRowClick(commit, e)}
-              ondblclick={() => handleRowDblClick(commit)}
-              oncontextmenu={(e) => { if (commit.hash === 'UNCOMMITTED') onUncommittedContextMenu(e); else onCommitContextMenu(e, commit); }}
-              onkeydown={(e) => { if (e.key === 'Enter') handleRowClick(commit); }}
-            >
-              {@render metaCells(commit)}
-            </div>
-          {/each}
-        </div>
-      {/if}
 
     </div>
 
@@ -1940,7 +1965,7 @@
   .commit-graph {
     height: 100%;
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
     position: relative;
   }
 
@@ -2002,7 +2027,37 @@
   }
 
   .graph-header > div {
-    padding: 0 10px;
+    padding: 0 var(--column-padding);
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .header-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .column-resize {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--border-color);
+    border-radius: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .column-resize:hover, .column-resize:focus-visible {
+    background: var(--vscode-focusBorder, #007fd4);
+    outline-offset: -2px;
   }
 
   /* ---- SVG layer - must be ABOVE rows so nodes/lines are visible ---- */
@@ -2096,7 +2151,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 0 10px;
+    padding: 0 var(--column-padding);
     overflow: hidden;
   }
 
@@ -2105,101 +2160,6 @@
   .col-meta {
     display: contents;
   }
-
-  /* The graph header's meta columns stay pinned to the right while the header
-     scrolls horizontally. (The body rows use the overlay below instead.) */
-  .commit-graph.h-scroll .col-meta {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    position: sticky;
-    right: 0;
-    z-index: 5;
-    background-color: var(--bg-secondary);
-    /* Cancel the `.graph-header > div` padding so the header labels line up exactly
-       with the overlay content below (whose cells carry their own padding). */
-    padding: 0;
-  }
-
-  /* Reserve the meta width inside each scrolling row. The visible meta is painted
-     by the pinned overlay, which is layered separately above the graph. */
-  .col-meta-spacer {
-    flex-shrink: 0;
-  }
-
-  /* Isolate so the graph SVG and the pinned meta overlay resolve their z-index in
-     one local context, regardless of any ancestor stacking contexts. */
-  .commit-graph.h-scroll .scroll-content {
-    isolation: isolate;
-  }
-
-  /* In horizontal-scroll mode the load-more row would otherwise sit at the
-     content's left origin and slide out of view as the user scrolls right to
-     follow a wide graph. Pin it to the left of the viewport (width stays the
-     visible width, so the centered button is always reachable without
-     horizontally scrolling back). */
-  .commit-graph.h-scroll .load-more-row {
-    position: sticky;
-    left: 0;
-    width: 100%;
-  }
-
-  /* Pinned meta columns. A direct child of .scroll-content with a z-index above the
-     graph SVG (3), so it reliably covers the lanes scrolling underneath — no reliance
-     on descendants escaping the rows' stacking context. */
-  .meta-overlay {
-    /* Native sticky pins it to the right edge with zero lag during horizontal
-       scroll. margin-left:auto right-aligns it so its static position is the
-       right of the content (the frozen-column pattern). */
-    position: sticky;
-    right: 0;
-    margin-left: auto;
-    z-index: 6;
-  }
-
-  .meta-row {
-    position: absolute;
-    left: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    background-color: var(--bg-primary);
-    cursor: pointer;
-    user-select: none;
-    /* Match the commit row's background transition so the message and the pinned
-       author/hash/date highlight in lock-step instead of one snapping early. */
-    transition: background 0.08s;
-  }
-
-  /* The overlay's share of the right-click highlight border: top, bottom and right
-     edges only, so it joins seamlessly with the commit row's outline (which covers
-     the message side and left edge) into one box around the whole row — no seam. */
-  .meta-row.highlighted:not(.selected) {
-    background-color: var(--bg-hover);
-    box-shadow:
-      inset 0 1px 0 var(--vscode-focusBorder, #007fd4),
-      inset 0 -1px 0 var(--vscode-focusBorder, #007fd4),
-      inset -1px 0 0 var(--vscode-focusBorder, #007fd4);
-  }
-  /* No focus ring on click/keyboard focus. */
-  .meta-row:focus-visible { outline: none; }
-
-  .meta-row.hovered { background-color: var(--bg-hover); }
-  .meta-row.selected { background-color: var(--bg-selected); }
-  .meta-row.selected .col-author,
-  .meta-row.selected .col-hash,
-  .meta-row.selected .col-date { color: var(--text-selected); opacity: 0.8; }
-  .meta-row.other-branch .col-author,
-  .meta-row.other-branch .col-hash,
-  .meta-row.other-branch .col-date { opacity: 0.6; }
-  .meta-row.search-dim { opacity: 0.3; }
-  .meta-row.search-current { background-color: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 20%, var(--bg-primary)); }
-  .meta-row.compare-base,
-  .meta-row.compare-active { background-color: color-mix(in srgb, #63b0f4 12%, var(--bg-primary)); }
-  .meta-row.bisect-bad,
-  .meta-row.bisect-start-bad { background-color: color-mix(in srgb, #f44336 12%, var(--bg-primary)); }
-  .meta-row.bisect-start-good { background-color: color-mix(in srgb, #4caf50 12%, var(--bg-primary)); }
-  .meta-row.bisect-culprit { background-color: color-mix(in srgb, #ff9800 15%, var(--bg-primary)); }
 
   .local-dot {
     width: 5px;
@@ -2224,9 +2184,11 @@
   }
 
   .col-author {
-    width: 120px;
+    width: var(--author-width);
     flex-shrink: 0;
-    padding: 0 10px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 var(--column-padding);
     color: var(--text-secondary);
     display: flex;
     align-items: center;
@@ -2264,18 +2226,22 @@
   }
 
   .col-date {
-    width: 150px;
+    width: var(--date-width);
     flex-shrink: 0;
-    padding: 0 10px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 var(--column-padding);
     color: var(--text-secondary);
     white-space: nowrap;
     text-align: left;
   }
 
   .col-hash {
-    width: 75px;
+    width: var(--hash-width);
     flex-shrink: 0;
-    padding: 0 10px;
+    min-width: 0;
+    padding: 0 var(--column-padding);
     font-family: var(--vscode-editor-font-family, monospace);
     color: var(--text-secondary);
     /* Large repos abbreviate hashes to 10-12 chars; clip so they never spill

@@ -51,7 +51,11 @@ describe('ContextMenu', () => {
       onClose,
       items: [{ label: 'Run', action }],
     });
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.menu-item')!);
+    const item = container.querySelector<HTMLButtonElement>('button.menu-item')!;
+    await fireEvent.mouseDown(item);
+    await fireEvent.mouseUp(item);
+    expect(onClose).not.toHaveBeenCalled();
+    await fireEvent.click(item);
     expect(action).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -88,6 +92,37 @@ describe('ContextMenu', () => {
     // Click on document.body (which is outside the .context-menu element).
     await fireEvent.mouseDown(document.body);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the backdrop through mousedown and consumes the outside click before closing', async () => {
+    const action = vi.fn();
+    const outsideAction = vi.fn();
+    const outside = document.createElement('button');
+    outside.addEventListener('click', outsideAction);
+    document.body.append(outside);
+    const onClose = vi.fn();
+    const { container, unmount } = render(ContextMenu, {
+      x: 20, y: 20,
+      onClose,
+      items: [{ label: 'Run', action }],
+    });
+    onClose.mockImplementation(() => unmount());
+    try {
+      const backdrop = container.querySelector<HTMLButtonElement>('.context-menu-backdrop')!;
+      await fireEvent.mouseDown(backdrop);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(backdrop.isConnected).toBe(true);
+      expect(container.querySelector('[role="menu"]')).not.toBeNull();
+      await fireEvent.mouseUp(backdrop);
+      expect(onClose).not.toHaveBeenCalled();
+      await fireEvent.click(backdrop);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(backdrop.isConnected).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+      expect(outsideAction).not.toHaveBeenCalled();
+    } finally {
+      outside.remove();
+    }
   });
 
   it('mousedown inside the menu does NOT trigger onClose', async () => {

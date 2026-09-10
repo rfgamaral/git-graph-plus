@@ -64,6 +64,15 @@
   });
 </script>
 
+<button
+  class="context-menu-backdrop"
+  aria-label="Close menu"
+  tabindex="-1"
+  onmousedown={(event) => event.stopPropagation()}
+  onclick={onClose}
+  oncontextmenu={(event) => { event.preventDefault(); onClose(); }}
+></button>
+
 <div
   class="context-menu"
   bind:this={menuEl}
@@ -134,6 +143,16 @@
 </div>
 
 <style>
+  .context-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    border: none;
+    padding: 0;
+    background: transparent;
+    cursor: default;
+  }
+
   .context-menu {
     position: fixed;
     z-index: 1000;

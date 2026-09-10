@@ -31,6 +31,7 @@ export function resolveConfiguredGitPath(): string | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  MainPanel.setColumnState(context.globalState);
   // Status bar is always visible regardless of workspace state
   const statusBar = new StatusBarManager();
   context.subscriptions.push(statusBar);

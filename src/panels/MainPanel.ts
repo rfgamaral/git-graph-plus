@@ -36,6 +36,12 @@ export class MainPanel {
   private static avatarCacheDir: string | undefined = undefined;
   private static avatarCache: AvatarCache | undefined = undefined;
 
+  private static columnState: vscode.Memento | undefined;
+
+  public static setColumnState(state: vscode.Memento): void {
+    this.columnState = state;
+  }
+
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private repoPath: string;
@@ -222,6 +228,9 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.defaultCommitTab')) {
           this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
         }
+        if (e.affectsConfiguration('gitGraphPlus.autoFitColumns')) {
+          this.post({ type: 'setAutoFitColumns', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('autoFitColumns', false) } });
+        }
         if (e.affectsConfiguration('gitGraphPlus.dateTimeFormat')) {
           this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
         }
@@ -265,6 +274,7 @@ export class MainPanel {
     this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
     this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
     this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
+    this.post({ type: 'setAutoFitColumns', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('autoFitColumns', false) } });
     this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
     void this.postCommitLinkRules();
 
@@ -410,6 +420,20 @@ export class MainPanel {
   private async handleMessage(message: WebviewMessage): Promise<void> {
     try {
       switch (message.type) {
+        case 'getGraphColumns':
+        case 'saveGraphColumns': {
+          const { repo, requestId } = message.payload;
+          if (typeof repo !== 'string' || !samePath(repo, this.repoPath)) break;
+          const key = `graphColumns:${vscode.Uri.file(repo).fsPath}`;
+          if (message.type === 'saveGraphColumns') {
+            const widths = message.payload.widths;
+            if (!Array.isArray(widths) || widths.length !== 3 || !widths.every(w => typeof w === 'number' && Number.isFinite(w) && w >= 0 && w <= 100000)) break;
+            await MainPanel.columnState?.update(key, widths);
+          } else {
+            this.post({ type: 'graphColumns', payload: { repo, requestId, widths: MainPanel.columnState?.get(key) } });
+          }
+          break;
+        }
         case 'getLog': {
           const cfg = vscode.workspace.getConfiguration('gitGraphPlus');
           const sortOrder = cfg.get<'author-date' | 'date' | 'topological'>('graphSortOrder', 'topological');

@@ -381,6 +381,11 @@
           "default": true,
           "description": "Automatically refresh when repository changes are detected"
         },
+        "gitGraphPlus.autoFitColumns": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically fit graph columns to their headers and loaded commits as the graph updates. Description uses the remaining space. Disables manual column resizing."
+        },
         "gitGraphPlus.locale": {
           "type": "string",
           "enum": [

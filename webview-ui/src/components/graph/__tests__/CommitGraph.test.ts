@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import CommitGraph from '../CommitGraph.svelte';
@@ -242,6 +242,183 @@ describe('CommitGraph smoke', () => {
     const { container: c2 } = render(CommitGraph, {});
     await tick();
     expect(c2.querySelectorAll('.commit-row').length).toBe(2);
+  });
+});
+
+describe('CommitGraph columns', () => {
+  let viewportWidth: number;
+  let originalRepo: string;
+  let originalAutoFit: boolean;
+  let originalDateFormat: string;
+
+  function widths(container: HTMLElement) {
+    const graph = container.querySelector<HTMLElement>('.commit-graph')!;
+    return ['author', 'hash', 'date'].map(name => parseFloat(graph.style.getPropertyValue(`--${name}-width`)));
+  }
+
+  function messages(type: string) {
+    return globalThis.__postedMessages.map(m => m.data as {
+      type: string; payload: { repo: string; requestId: string; widths?: number[] };
+    }).filter(m => m.type === type);
+  }
+
+  async function restore(request: ReturnType<typeof messages>[number], values: number[]) {
+    await fireEvent(window, new MessageEvent('message', {
+      data: { type: 'graphColumns', payload: { ...request.payload, widths: values } },
+    }));
+  }
+
+  beforeEach(() => {
+    originalRepo = uiStore.activeRepo;
+    originalAutoFit = uiStore.autoFitColumns;
+    originalDateFormat = uiStore.dateTimeFormat;
+    uiStore.activeRepo = '/repo-a';
+    uiStore.autoFitColumns = false;
+    uiStore.dateTimeFormat = 'YYYY';
+    viewportWidth = 1000;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => viewportWidth);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600);
+    vi.spyOn(HTMLElement.prototype, 'setPointerCapture').mockImplementation(() => {});
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      font: '',
+      measureText: (text: string) => ({ width: text.length * 10 }),
+    } as CanvasRenderingContext2D);
+    commitStore.setData(makeGraphData([makeCommit('h1', 'first')]));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    uiStore.activeRepo = originalRepo;
+    uiStore.autoFitColumns = originalAutoFit;
+    uiStore.dateTimeFormat = originalDateFormat;
+  });
+
+  it('redistributes adjacent columns, clamps both ends, and saves only when dragging ends', async () => {
+    const { container } = render(CommitGraph, {});
+    await tick();
+    const handle = container.querySelectorAll('.column-resize')[1];
+    expect(widths(container)).toEqual([120, 75, 150]);
+    await fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 200 });
+    await fireEvent.pointerMove(handle, { pointerId: 1, clientX: 210 });
+    expect(widths(container)).toEqual([130, 65, 150]);
+    await fireEvent.pointerMove(handle, { pointerId: 1, clientX: 1000 });
+    expect(widths(container)).toEqual([140, 55, 150]);
+    await fireEvent.pointerMove(handle, { pointerId: 1, clientX: 0 });
+    expect(widths(container)).toEqual([70, 125, 150]);
+    expect(messages('saveGraphColumns')).toEqual([]);
+    await fireEvent.pointerUp(handle, { pointerId: 1 });
+    expect(messages('saveGraphColumns')).toEqual([
+      { type: 'saveGraphColumns', payload: { repo: '/repo-a', widths: [70, 125, 150] } },
+    ]);
+  });
+
+  it('protects description width and clamps columns to a shrinking viewport without overwriting preferences', async () => {
+    const { container } = render(CommitGraph, {});
+    await tick();
+    const handle = container.querySelectorAll('.column-resize')[0];
+    await fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 500 });
+    await fireEvent.pointerMove(handle, { pointerId: 1, clientX: -1000 });
+    expect(widths(container)).toEqual([655, 75, 150]);
+    await fireEvent.pointerUp(handle, { pointerId: 1 });
+    viewportWidth = 315;
+    await fireEvent.resize(window);
+    expect(widths(container)).toEqual([70, 55, 70]);
+    viewportWidth = 157.5;
+    await fireEvent.resize(window);
+    expect(widths(container)).toEqual([35, 27.5, 35]);
+    viewportWidth = 1000;
+    await fireEvent.resize(window);
+    expect(widths(container)).toEqual([655, 75, 150]);
+    expect(messages('saveGraphColumns')).toHaveLength(1);
+  });
+
+  it('requests each repository and rejects old requests and responses arriving after manual resizing', async () => {
+    const { container } = render(CommitGraph, {});
+    await tick();
+    const first = messages('getGraphColumns')[0];
+    expect(first.payload.repo).toBe('/repo-a');
+    await restore(first, [180, 90, 160]);
+    expect(widths(container)).toEqual([180, 90, 160]);
+    uiStore.activeRepo = '/repo-b';
+    await tick();
+    const second = messages('getGraphColumns')[1];
+    expect(second.payload.repo).toBe('/repo-b');
+    expect(widths(container)).toEqual([120, 75, 150]);
+    await restore(first, [300, 100, 200]);
+    expect(widths(container)).toEqual([120, 75, 150]);
+    await restore(second, [150, 80, 170]);
+    expect(widths(container)).toEqual([150, 80, 170]);
+    uiStore.activeRepo = '/repo-a';
+    await tick();
+    const third = messages('getGraphColumns')[2];
+    expect(third.payload.requestId).not.toBe(first.payload.requestId);
+    await restore(first, [300, 100, 200]);
+    expect(widths(container)).toEqual([120, 75, 150]);
+    const handle = container.querySelectorAll('.column-resize')[2];
+    await fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 100 });
+    await fireEvent.pointerMove(handle, { pointerId: 1, clientX: 120 });
+    await restore(third, [300, 100, 200]);
+    expect(widths(container)).toEqual([120, 95, 130]);
+    await fireEvent.pointerUp(handle, { pointerId: 1 });
+    await restore(third, [300, 100, 200]);
+    expect(widths(container)).toEqual([120, 95, 130]);
+  });
+
+  it('auto-fits from the header menu using headers and loaded content, including off-screen commits', async () => {
+    const { container, getByRole } = render(CommitGraph, {});
+    await tick();
+    await fireEvent.contextMenu(container.querySelector('.graph-header')!);
+    await fireEvent.click(getByRole('menuitem', { name: 'Auto-fit columns' }));
+    expect(widths(container)).toEqual([80, 55, 70]);
+    const commits = Array.from({ length: 100 }, (_, i) => makeCommit(`h${i}`, 'commit'));
+    commits[99].author.name = 'Long author name';
+    commits[99].abbreviatedHash = '123456789abc';
+    commitStore.setData(makeGraphData(commits));
+    await tick();
+    expect(container.querySelectorAll('.commit-row').length).toBeLessThan(100);
+    await fireEvent.contextMenu(container.querySelector('.graph-header')!);
+    await fireEvent.click(getByRole('menuitem', { name: 'Auto-fit columns' }));
+    const fitted = widths(container);
+    expect(fitted[0]).toBeGreaterThan('Long author name'.length * 10);
+    expect(fitted.slice(1)).toEqual([140, 70]);
+    expect(messages('saveGraphColumns').at(-1)?.payload.widths).toEqual(fitted);
+    commitStore.commits[99].author.name += ' extended';
+    await tick();
+    await fireEvent.contextMenu(container.querySelector('.graph-header')!);
+    await fireEvent.click(getByRole('menuitem', { name: 'Auto-fit columns' }));
+    expect(widths(container)).toEqual([fitted[0] + 90, 140, 70]);
+  });
+
+  it('refits after loading more and changing date format, disables dragging, and restores manual widths when turned off', async () => {
+    const { container } = render(CommitGraph, {});
+    await tick();
+    await restore(messages('getGraphColumns')[0], [180, 90, 160]);
+    uiStore.autoFitColumns = true;
+    await tick();
+    expect(container.querySelector('.column-resize')).toBeNull();
+    expect(widths(container)).toEqual([80, 55, 70]);
+    await fireEvent.contextMenu(container.querySelector('.graph-header')!);
+    expect(container.querySelector('.context-menu')).toBeNull();
+    commitStore.loading = true;
+    const longer = makeCommit('123456789abc', 'loaded later');
+    longer.author.name = 'Long author name';
+    commitStore.commits = [...commitStore.commits, longer];
+    await tick();
+    expect(widths(container)).toEqual([80, 55, 70]);
+    commitStore.loading = false;
+    await tick();
+    const fitted = widths(container);
+    expect(fitted[0]).toBeGreaterThan('Long author name'.length * 10);
+    expect(fitted.slice(1)).toEqual([90, 70]);
+    uiStore.dateTimeFormat = 'YYYY-MM-DD HH:mm:ss';
+    await tick();
+    expect(widths(container)).toEqual([fitted[0], 90, 210]);
+    expect(messages('saveGraphColumns')).toEqual([]);
+    uiStore.autoFitColumns = false;
+    await tick();
+    expect(container.querySelectorAll('.column-resize')).toHaveLength(3);
+    expect(widths(container)).toEqual([180, 90, 160]);
   });
 });
 

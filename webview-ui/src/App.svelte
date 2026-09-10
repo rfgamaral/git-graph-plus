@@ -141,6 +141,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setDefaultCommitTab':
           uiStore.defaultCommitTab = msg.payload.tab;
           break;
+        case 'setAutoFitColumns':
+          uiStore.autoFitColumns = msg.payload.enabled;
+          break;
         case 'setDateTimeFormat':
           uiStore.dateTimeFormat = msg.payload.format;
           break;

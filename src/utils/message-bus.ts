@@ -27,6 +27,8 @@ export interface ModalDefaults {
 
 // Messages from Webview → Extension
 export type WebviewMessage =
+  | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
+  | { type: 'saveGraphColumns'; payload: { repo: string; widths: number[]; requestId?: string } }
   | { type: 'getLog'; payload: { branch?: string; branches?: string[]; limit?: number; skip?: number; remoteFilter?: string[] } }
   | { type: 'getBranches' }
   | { type: 'getRepoList' }
