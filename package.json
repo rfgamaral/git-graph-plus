@@ -602,7 +602,6 @@
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "@vitest/coverage-v8": "^3.2.4",
     "@vscode/vsce": "^3.0.0",
     "concurrently": "^9.0.0",
     "esbuild": "^0.25.12",

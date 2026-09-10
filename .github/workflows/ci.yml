@@ -45,26 +45,8 @@ jobs:
       - name: Type check (webview)
         run: cd webview-ui && npm run check
 
-      - name: Run tests with coverage
-        run: npx vitest run --coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      # Codecov Test Analytics — flaky detection, slow-test ranking, failure
-      # history. `if: always()` so failed runs still upload (the failures are
-      # the most interesting data points).
-      - name: Upload test results to Codecov
-        if: always()
-        uses: codecov/test-results-action@v1
-        with:
-          files: ./test-results.xml
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Run tests
+        run: npm test
 
       - name: Build extension
         run: npm run build:extension
