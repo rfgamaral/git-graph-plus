@@ -1744,7 +1744,7 @@
           disabled={commitStore.loadingMore}
           onclick={() => {
             commitStore.setLoadingMore(true);
-            vscode.postMessage({ type: 'getLog', payload: { limit: commitStore.currentLimit + uiStore.loadMoreCount } });
+            vscode.postMessage({ type: 'getLog', payload: { repo: uiStore.activeRepo || undefined, limit: commitStore.currentLimit + uiStore.loadMoreCount } });
           }}
         >
           {#if commitStore.loadingMore}

@@ -32,7 +32,7 @@ export type WebviewMessage =
   | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
   | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
   | { type: 'saveGraphColumns'; payload: { repo: string; widths: number[]; requestId?: string } }
-  | { type: 'getLog'; payload: { branch?: string; branches?: string[]; limit?: number; skip?: number; remoteFilter?: string[] } }
+  | { type: 'getLog'; payload: { repo?: string; branch?: string; branches?: string[]; limit?: number; skip?: number; remoteFilter?: string[] } }
   | { type: 'getBranches' }
   | { type: 'getRepoList' }
   | { type: 'checkDirty'; payload?: { requestId?: string } }

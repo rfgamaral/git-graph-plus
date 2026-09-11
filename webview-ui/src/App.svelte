@@ -115,17 +115,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
   $effect(() => {
     const name = pendingBranch;
     if (!name || commitStore.loading || commitStore.loadingMore || commitStore.notGitRepo) return;
-    if (remoteFilter.length || branchFilter.length) {
-      remoteFilter = [];
-      branchFilter = [];
-      commitStore.setLoading(true);
-      vscode.postMessage({ type: 'getLog', payload: {
-        limit: commitStore.currentLimit || undefined,
-        branches: [],
-        remoteFilter: [],
-      }});
-      return;
-    }
     const commit = commitStore.commits.find(c => c.refs.some(r => (r.type === 'branch' || r.type === 'head') && r.name === name));
     if (commit) {
       void tick().then(() => {
@@ -134,12 +123,17 @@ import AmendModal from './components/modals/AmendModal.svelte';
         uiStore.selectCommit(commit.hash);
         uiStore.focusCommit(commit.hash);
       });
-    } else if (commitStore.hasMore) {
+      return;
+    }
+    if (remoteFilter.length || branchFilter.length) {
+      pendingBranch = null;
+      return;
+    }
+    if (commitStore.hasMore) {
       commitStore.setLoadingMore(true);
       vscode.postMessage({ type: 'getLog', payload: {
+        repo: uiStore.activeRepo || undefined,
         limit: Math.max(commitStore.currentLimit * 2, commitStore.currentLimit + uiStore.loadMoreCount),
-        branches: [],
-        remoteFilter: [],
       }});
     } else {
       pendingBranch = null;
@@ -222,9 +216,11 @@ import AmendModal from './components/modals/AmendModal.svelte';
           avatarStore.receive(msg.payload.email, msg.payload.size, msg.payload.dataUri);
           break;
         case 'repoList':
-          if (uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) pendingBranch = null;
-          if (uiStore.alwaysShowCommitDetails && uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) {
-            uiStore.selectCommit(null);
+          if (uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) {
+            pendingBranch = null;
+            remoteFilter = [];
+            branchFilter = [];
+            if (uiStore.alwaysShowCommitDetails) uiStore.selectCommit(null);
             commitStore.setLoading(true);
           }
           uiStore.repos = msg.payload.repos;
@@ -322,7 +318,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
 
     // Request initial data
     commitStore.setLoading(true);
-    vscode.postMessage({ type: 'getLog', payload: {} });
+    vscode.postMessage({ type: 'getLog', payload: { repo: uiStore.activeRepo || undefined } });
     vscode.postMessage({ type: 'getBranches' });
     vscode.postMessage({ type: 'checkFlowStatus' });
     vscode.postMessage({ type: 'getAuthorColors' });
@@ -364,6 +360,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
       e.preventDefault();
       commitStore.setLoading(true);
       vscode.postMessage({ type: 'getLog', payload: {
+        repo: uiStore.activeRepo || undefined,
         limit: commitStore.currentLimit || undefined,
         branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
         remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
@@ -419,9 +416,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
     vscode.postMessage({
       type: 'getLog',
       payload: {
+        repo: uiStore.activeRepo || undefined,
         limit: commitStore.currentLimit || undefined,
-        branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
-        remoteFilter: filter.length > 0 ? [...filter] : undefined,
+        branches: [...branchFilter],
+        remoteFilter: [...filter],
       },
     });
   }
@@ -432,9 +430,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
     vscode.postMessage({
       type: 'getLog',
       payload: {
+        repo: uiStore.activeRepo || undefined,
         limit: commitStore.currentLimit || undefined,
-        branches: branches.length > 0 ? [...branches] : undefined,
-        remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
+        branches: [...branches],
+        remoteFilter: [...remoteFilter],
       },
     });
   }
@@ -482,6 +481,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   <Toolbar onRefresh={() => {
     commitStore.setLoading(true);
     vscode.postMessage({ type: 'getLog', payload: {
+      repo: uiStore.activeRepo || undefined,
       limit: commitStore.currentLimit || undefined,
       branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
       remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,

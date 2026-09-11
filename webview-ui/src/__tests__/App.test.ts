@@ -1485,6 +1485,31 @@ describe('App — filter change handlers', () => {
     return msgs.length ? (msgs[msgs.length - 1].data as { payload: Record<string, unknown> }).payload : null;
   }
 
+  it.each(['main', 'excluded'])('preserves restored filters when opening through sidebar branch %s', async (name) => {
+    const { container } = render(App);
+    const main: Commit = {
+      hash: 'main-tip', abbreviatedHash: 'main', subject: 'Main commit', body: '', parents: [],
+      author: { name: 'A', email: 'a@x.com', date: '' },
+      committer: { name: 'A', email: 'a@x.com', date: '' },
+      refs: [{ name: 'main', type: 'branch' }],
+    };
+    postMsg('showBranch', { name });
+    postMsg('logData', {
+      commits: [main], graph: [], hasMore: true, currentLimit: 100,
+      remoteFilter: ['local'], branches: ['main'],
+    });
+    await waitFor(() => {
+      const filters = container.querySelectorAll('.filter-btn');
+      expect(filters).toHaveLength(2);
+      expect(filters[0].querySelector('.filter-count')?.textContent).toBe('1');
+      expect(filters[1].querySelector('.filter-count')?.textContent).toBe('1');
+      expect(uiStore.selectedCommitHash).toBe(name === 'main' ? main.hash : null);
+    });
+    expect(globalThis.__postedMessages.filter(m => (m.data as { type?: string }).type === 'getLog')).toHaveLength(1);
+    expect(commitStore.loading).toBe(false);
+    expect(commitStore.loadingMore).toBe(false);
+  });
+
   it('selecting a branch in the branch filter posts getLog with that branch', async () => {
     const { container } = render(App);
     postMsg('branchData', {
@@ -1545,8 +1570,7 @@ describe('App — filter change handlers', () => {
       .find(el => el.textContent?.includes('origin'))!;
     await fireEvent.click(remoteItem);
     await waitFor(() => lastGetLog() !== null);
-    // branchFilter emptied → getLog carries no `branches`, only the remote filter.
-    expect(lastGetLog()!.branches).toBeUndefined();
+    expect(lastGetLog()!.branches).toEqual([]);
     expect((lastGetLog()!.remoteFilter as string[])).toContain('origin');
   });
 });

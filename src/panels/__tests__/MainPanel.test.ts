@@ -448,33 +448,96 @@ describe('MainPanel orchestration logic', () => {
     // The foreign commit from the old repo must never reach the webview.
     expect(logs.some(l => (l.payload!.commits as Array<{ hash: string }>).some(c => c.hash === 'aaaaaaa1'))).toBe(false);
   });
+});
 
-  it('refreshAll applies the saved filter before the first getLog so it does not flash the full unfiltered graph', async () => {
-    const M = MainPanel as unknown as { savedRemoteFilter?: string[]; savedBranchFilter?: string[] };
-    const prevRemote = M.savedRemoteFilter;
-    const prevBranch = M.savedBranchFilter;
-    M.savedRemoteFilter = ['origin'];
-    M.savedBranchFilter = ['main'];
-    try {
-      H.git.log.mockResolvedValue([commit('aaaaaaa1')] as never);
+describe('MainPanel log filters', () => {
+  let values: Map<string, unknown>;
 
-      // An early refresh (file watcher / repo auto-switch / config change) can
-      // fire before the webview's first getLog establishes the session filter.
-      await (MainPanel.currentPanel as unknown as { refreshAll(): Promise<void> }).refreshAll();
+  beforeEach(() => {
+    values = new Map();
+    MainPanel.setGlobalState({
+      keys: () => [...values.keys()],
+      get: <T>(key: string, fallback?: T) => values.has(key) ? values.get(key) as T : fallback,
+      update: async (key: string, value: unknown) => {
+        if (value === undefined) values.delete(key);
+        else values.set(key, value);
+      },
+    } as import('vscode').Memento);
+    H.git.branches.mockResolvedValue([
+      { name: 'main', current: true, ahead: 0, behind: 0, hash: 'a' },
+      { name: 'origin/main', remote: 'origin', current: false, ahead: 0, behind: 0, hash: 'a' },
+    ]);
+    H.git.remotes.mockResolvedValue([{ name: 'origin', fetchUrl: '', pushUrl: '' }]);
+  });
 
-      const logArgs = H.git.log.mock.calls.at(-1)![0] as { remoteFilter?: unknown; branches?: unknown };
-      expect(logArgs.remoteFilter).toEqual(['origin']);
-      expect(logArgs.branches).toEqual(['main']);
+  afterEach(() => values.clear());
 
-      // The graph payload must carry the same filter the webview will keep.
-      const refresh = postedOfType('fullRefresh').at(-1)!;
-      const logData = (refresh.payload as { logData: { remoteFilter?: unknown; branches?: unknown } }).logData;
-      expect(logData.remoteFilter).toEqual(['origin']);
-      expect(logData.branches).toEqual(['main']);
-    } finally {
-      M.savedRemoteFilter = prevRemote;
-      M.savedBranchFilter = prevBranch;
-    }
+  it('saves before the log completes and restores filters after reopening', async () => {
+    const filters = { remoteFilter: ['local'], branches: ['main'] };
+    let finishLog!: (commits: unknown[]) => void;
+    H.git.log.mockImplementationOnce(() => new Promise(resolve => { finishLog = resolve; }));
+    const request = dispatch({ type: 'getLog', payload: filters });
+    expect(values.get('logFilters:/repo')).toEqual(filters);
+    finishLog([]);
+    await request;
+
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    values = new Map(JSON.parse(JSON.stringify([...values])));
+    MainPanel.createOrShow(extUri, '/repo');
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(postedOfType('logData').at(-1)?.payload).toMatchObject(filters);
+
+    await dispatch({ type: 'getLog', payload: { limit: 2000 } });
+    expect(H.git.log.mock.calls.at(-1)?.[0]).toMatchObject(filters);
+    expect(values.get('logFilters:/repo')).toEqual(filters);
+  });
+
+  it('restores each repository independently and ignores requests from the previous one', async () => {
+    const local = { remoteFilter: ['local'], branches: ['main'] };
+    const remote = { remoteFilter: ['origin'], branches: ['origin/main'] };
+    H.repos.push({ path: '/repo-b', name: 'repo-b', type: 'root' });
+    await dispatch({ type: 'getRepoList' });
+    await dispatch({ type: 'getLog', payload: local });
+    values.set('logFilters:/repo-b', remote);
+
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo-b' } });
+    expect(postedOfType('fullRefresh').at(-1)?.payload?.logData).toMatchObject(remote);
+    const calls = H.git.log.mock.calls.length;
+    await dispatch({ type: 'getLog', payload: { repo: '/repo', remoteFilter: [], branches: [] } });
+    expect(H.git.log).toHaveBeenCalledTimes(calls);
+    expect(values.get('logFilters:/repo-b')).toEqual(remote);
+
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo' } });
+    expect(postedOfType('fullRefresh').at(-1)?.payload?.logData).toMatchObject(local);
+  });
+
+  it('applies saved filters to a refresh before the first getLog', async () => {
+    const filters = { remoteFilter: ['origin'], branches: ['origin/main'] };
+    values.set('logFilters:/repo', filters);
+    await (MainPanel.currentPanel as unknown as { refreshAll(): Promise<void> }).refreshAll();
+    expect(H.git.log.mock.calls.at(-1)?.[0]).toMatchObject(filters);
+    expect(postedOfType('fullRefresh').at(-1)?.payload?.logData).toMatchObject(filters);
+  });
+
+  it.each([
+    { remoteFilter: ['origin', 'gone'], branches: ['origin/main', 'deleted'], expected: { remoteFilter: ['origin'], branches: ['origin/main'] } },
+    { remoteFilter: ['gone'], branches: ['deleted'], expected: { remoteFilter: [], branches: [] } },
+  ])('drops missing selections from $remoteFilter and $branches', async ({ remoteFilter, branches, expected }) => {
+    values.set('logFilters:/repo', { remoteFilter, branches });
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(H.git.log.mock.calls.at(-1)?.[0]).toMatchObject(expected);
+    expect(postedOfType('logData').at(-1)?.payload).toMatchObject(expected);
+    expect(values.get('logFilters:/repo')).toEqual(expected.branches.length ? expected : undefined);
+  });
+
+  it('keeps an explicit clear after reopening', async () => {
+    values.set('logFilters:/repo', { remoteFilter: ['local'], branches: ['main'] });
+    await dispatch({ type: 'getLog', payload: { remoteFilter: [], branches: [] } });
+    expect(values.has('logFilters:/repo')).toBe(false);
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    MainPanel.createOrShow(extUri, '/repo');
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(postedOfType('logData').at(-1)?.payload).toMatchObject({ remoteFilter: [], branches: [] });
   });
 });
 
