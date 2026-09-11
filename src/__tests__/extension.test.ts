@@ -51,6 +51,7 @@ vi.mock('../git/git-binary', () => ({ setGitBinaryPath: vi.fn() }));
 vi.mock('../panels/MainPanel', () => ({
   MainPanel: class {
     static currentPanel: unknown = undefined;
+    static setGlobalState = vi.fn();
     static setExtraEnv = vi.fn();
     static setAvatarCacheDir = vi.fn();
     static createOrShow = vi.fn();
@@ -73,9 +74,14 @@ void viewStub;
 
 import { activate, resolveConfiguredGitPath } from '../extension';
 import { existsSync } from 'fs';
+import { MainPanel } from '../panels/MainPanel';
 
 function makeContext() {
-  return { subscriptions: [] as Array<{ dispose(): void }>, extensionUri: {} } as unknown as import('vscode').ExtensionContext;
+  return {
+    subscriptions: [] as Array<{ dispose(): void }>,
+    extensionUri: {},
+    globalState: { keys: () => [], get: vi.fn(), update: vi.fn(async () => {}) },
+  } as unknown as import('vscode').ExtensionContext;
 }
 
 beforeEach(() => {
@@ -118,6 +124,7 @@ describe('activate', () => {
     H.workspaceFolders = undefined;
     const ctx = makeContext();
     activate(ctx);
+    expect(MainPanel.setGlobalState).toHaveBeenCalledWith(ctx.globalState);
     expect(H.registeredCommands).toContain('git-graph-plus.open');
     expect(H.registeredCommands).toContain('gitGraphPlus.open');
     expect(H.treeViewsCreated).toEqual([]);
