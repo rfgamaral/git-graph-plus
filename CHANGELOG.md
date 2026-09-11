@@ -1,3 +1,26 @@
+# [0.9.0](https://github.com/rfgamaral/git-graph-plus/compare/v0.8.0...v0.9.0) (2026-09-11)
+
+
+### Bug Fixes
+
+* add consistent padding to menu items and submenus ([41bdfbf](https://github.com/rfgamaral/git-graph-plus/commit/41bdfbf803cdbac0a7b4596ac639cacdf00b5dc8))
+* use horizontal resize cursors for columns and the file divider ([b7bb99e](https://github.com/rfgamaral/git-graph-plus/commit/b7bb99eca3a392ad19ef544fde641261cb108d8c))
+
+
+### Features
+
+* add an option to expand all branch sidebar folders by default ([249ff9f](https://github.com/rfgamaral/git-graph-plus/commit/249ff9ff2ad177d9cf2c0e906642eb3549a9bdbe))
+* add persistent, customizable author color highlights ([86e9dc8](https://github.com/rfgamaral/git-graph-plus/commit/86e9dc851e6d92c6219a8a33eea8f6c9854fc13e))
+* add resizable graph columns with saved widths and auto-fit ([da6e7ef](https://github.com/rfgamaral/git-graph-plus/commit/da6e7ef8c0330abe64e1da638d733132f11af237))
+* add right-side docking and an always-visible commit details mode ([7cd19e6](https://github.com/rfgamaral/git-graph-plus/commit/7cd19e6e3ee9a5517673e7805d49cfb197e940eb))
+* remember git log source and branch filters per repository ([28de4f0](https://github.com/rfgamaral/git-graph-plus/commit/28de4f06f013151a68cb86b391907ebea12980fd))
+* render images, HTML, alerts, and footnotes in commit details ([12d571e](https://github.com/rfgamaral/git-graph-plus/commit/12d571eca34133f3f1acfc8af5f63f8b7b5cc008))
+* replace fallback avatars with theme-aware geometric patterns ([59b7c77](https://github.com/rfgamaral/git-graph-plus/commit/59b7c77ac3c6ac15308b1a2c8f606a317761e6cb))
+* replace the commit details resize grip with a highlighted border ([4f3649e](https://github.com/rfgamaral/git-graph-plus/commit/4f3649e6f990a9e6b0a886d74eacdf958afe2ac0))
+* select branch tip commits by clicking branches in the sidebar ([ff9fa7c](https://github.com/rfgamaral/git-graph-plus/commit/ff9fa7c0032022d5a9b691fdb63891297f347423))
+* show missing and unconfigured upstreams in the branch sidebar ([18b1e1f](https://github.com/rfgamaral/git-graph-plus/commit/18b1e1ff13f88a5a2cd017a212e336f569b8d758))
+* show the HEAD commit title in bold in the git log ([a7a4989](https://github.com/rfgamaral/git-graph-plus/commit/a7a4989c480601819a16396c886c040ed3a9fc22))
+
 # Changelog
 
 ## [0.8.0](https://github.com/rfgamaral/git-graph-plus/compare/v0.7.3...v0.8.0) (2026-09-10)
