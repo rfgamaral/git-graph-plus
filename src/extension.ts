@@ -113,7 +113,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // --- Tree View Providers ---
-  const branchesProvider = new BranchesViewProvider(activeGitService);
+  let expandBranchFolders = vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('expandBranchFolders', false) === true;
+  const branchesProvider = new BranchesViewProvider(activeGitService, expandBranchFolders);
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+    if (e.affectsConfiguration('gitGraphPlus.expandBranchFolders')) {
+      expandBranchFolders = vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('expandBranchFolders', false) === true;
+      branchesProvider.setExpandFolders(expandBranchFolders);
+    }
+  }));
   const remotesProvider = new RemotesViewProvider(activeGitService);
   const tagsProvider = new TagsViewProvider(activeGitService);
   const stashesProvider = new StashesViewProvider(activeGitService);
@@ -240,6 +247,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (sidebarRefreshing) { sidebarRefreshQueued = true; return; }
     sidebarRefreshing = true;
     try {
+      const previousBranch = branchesProvider.getCurrentItem()?.branch.name;
       await Promise.all([
         branchesProvider.refresh(),
         remotesProvider.refresh(),
@@ -251,7 +259,7 @@ export function activate(context: vscode.ExtensionContext) {
       // Reveal current branch in sidebar (auto-expands folders)
       // ONLY if the view is already visible to prevent jumping to the SCM tab
       const currentItem = branchesProvider.getCurrentItem();
-      if (currentItem && branchesView.visible) {
+      if (currentItem && branchesView.visible && (!expandBranchFolders || currentItem.branch.name !== previousBranch)) {
         // Small delay to ensure the tree view has processed the data change
         setTimeout(() => {
           branchesView.reveal(currentItem, { select: false, focus: false, expand: true }).then(undefined, () => {});

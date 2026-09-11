@@ -443,6 +443,11 @@
           "default": true,
           "markdownDescription": "Show a GPG/SSH signature status icon next to each commit in the graph. ⚠️ This verifies the signature of every commit in the log, which can slow down loading on very large repositories — turn it off if you notice slow graph loading. The Commit Details panel always shows signature status on demand regardless of this setting."
         },
+        "gitGraphPlus.expandBranchFolders": {
+          "type": "boolean",
+          "default": false,
+          "description": "Expand all folders in the branch sidebar by default. Manually collapsed folders stay collapsed during refreshes."
+        },
         "gitGraphPlus.branchBadgeBarThickness": {
           "type": "string",
           "enum": [

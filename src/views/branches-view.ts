@@ -11,7 +11,13 @@ export class BranchesViewProvider implements vscode.TreeDataProvider<BranchTreeI
   private pending: Promise<void> | null = null;
   private currentItem: BranchLeafItem | null = null;
 
-  constructor(private gitService: GitService) {}
+  constructor(private gitService: GitService, private expandFolders = false) {}
+
+  setExpandFolders(expandFolders: boolean): void {
+    if (this.expandFolders === expandFolders) return;
+    this.expandFolders = expandFolders;
+    this._onDidChangeTreeData.fire();
+  }
 
   public setGitService(gitService: GitService): void {
     this.gitService = gitService;
@@ -61,6 +67,16 @@ export class BranchesViewProvider implements vscode.TreeDataProvider<BranchTreeI
   }
 
   getTreeItem(element: BranchTreeItem): vscode.TreeItem {
+    if (element instanceof BranchFolderItem) {
+      element.collapsibleState = this.expandFolders
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.Collapsed;
+      const path: string[] = [];
+      for (let folder: BranchFolderItem | undefined = element; folder; folder = folder.parent) {
+        path.unshift(folder.folderName);
+      }
+      element.id = JSON.stringify([this.gitService.rootPath, this.expandFolders, ...path]);
+    }
     return element;
   }
 
