@@ -1672,16 +1672,23 @@
   }
 
   .resize-handle {
-    width: 4px;
+    width: 1px;
     flex-shrink: 0;
     cursor: ew-resize;
-    background: transparent;
-    border-right: 1px solid var(--border-color);
+    position: relative;
+    z-index: 1;
+    background: var(--border-color);
+  }
+
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+    inset: 0 -1px;
     transition: background 0.15s;
   }
 
-  .resize-handle:hover,
-  .resize-handle.resizing {
+  .resize-handle:hover::after,
+  .resize-handle.resizing::after {
     background: var(--vscode-sash-hoverBorder, rgba(128, 128, 128, 0.4));
   }
 

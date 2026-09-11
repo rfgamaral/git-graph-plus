@@ -611,9 +611,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
               role="separator"
               aria-orientation={uiStore.commitDetailsPosition === 'right' ? 'vertical' : 'horizontal'}
               onmousedown={startResize}
-            >
-              <div class="resize-handle-line"></div>
-            </div>
+            ></div>
           {/if}
           <div class="bottom-area" class:fullscreen={uiStore.commitDetailFullscreen} style={uiStore.commitDetailFullscreen ? '' : uiStore.commitDetailsPosition === 'right' ? `width: ${uiStore.rightPanelWidth}px;` : `height: ${uiStore.bottomPanelHeight}px;`}>
             <BottomPanel />
@@ -1215,26 +1213,24 @@ import AmendModal from './components/modals/AmendModal.svelte';
   }
 
   .resize-handle-h {
-    height: 12px;
+    height: 1px;
     cursor: ns-resize;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     position: relative;
-  }
-
-  .resize-handle-line {
-    width: 80px;
-    height: 4px;
-    border-radius: 2px;
+    z-index: 1;
     background: var(--border-color);
-    transition: background 0.15s, width 0.15s;
   }
 
-  .resize-handle-h:hover .resize-handle-line {
-    background: var(--vscode-focusBorder, #007fd4);
-    width: 120px;
+  .resize-handle-h::after {
+    content: '';
+    position: absolute;
+    inset: -1px 0;
+    transition: background 0.15s;
+  }
+
+  .resize-handle-h:hover::after,
+  .app-container.resizing .resize-handle-h::after {
+    background: var(--vscode-sash-hoverBorder, rgba(128, 128, 128, 0.4));
   }
 
   .details-right.resizing, .details-right .resize-handle-h {
@@ -1242,19 +1238,12 @@ import AmendModal from './components/modals/AmendModal.svelte';
   }
 
   .details-right .resize-handle-h {
-    width: 12px;
+    width: 1px;
     height: auto;
   }
 
-  .details-right .resize-handle-line {
-    width: 4px;
-    height: 80px;
-    transition: background 0.15s, height 0.15s;
-  }
-
-  .details-right .resize-handle-h:hover .resize-handle-line {
-    width: 4px;
-    height: 120px;
+  .details-right .resize-handle-h::after {
+    inset: 0 -1px;
   }
 
   /* ---- Light theme overrides ---- */
@@ -1289,26 +1278,21 @@ import AmendModal from './components/modals/AmendModal.svelte';
        available area so it can never overflow .content-area and get clipped;
        BottomPanel then scrolls internally instead of becoming unreachable. */
     max-height: 80%;
-    border-top: 1px solid var(--border-color);
   }
 
   .details-right .bottom-area {
     height: 100%;
     max-height: none;
     max-width: 70%;
-    border-top: none;
-    border-left: 1px solid var(--border-color);
   }
 
   .details-right .bottom-area.fullscreen {
     max-width: none;
-    border-left: none;
   }
 
   .bottom-area.fullscreen {
     flex: 1;
     max-height: none;
-    border-top: none;
   }
 
   :global(.vsg-tooltip) {
