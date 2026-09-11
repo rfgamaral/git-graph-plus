@@ -30,10 +30,7 @@
   // to Markdown and let the user switch to plain — that choice applies only
   // while viewing this commit (keyed by hash), so navigating re-detects.
   let messageOverride = $state<{ hash: string; mode: 'markdown' | 'plain' } | null>(null);
-  const messageText = $derived(
-    commit ? (commit.body ? `${commit.subject}\n\n${commit.body}` : commit.subject) : '',
-  );
-  const messageHasMarkdown = $derived(hasMarkdown(messageText));
+  const messageHasMarkdown = $derived(hasMarkdown(commit?.body ?? ''));
   const messageMode = $derived<'markdown' | 'plain'>(
     messageOverride && commit && messageOverride.hash === commit.hash
       ? messageOverride.mode
@@ -822,27 +819,30 @@
 
       <!-- Commit message -->
       <div class="message-section">
-        {#if messageHasMarkdown}
-          <div class="message-view-toggle">
-            <button
-              class:active={messageMode === 'markdown'}
-              onclick={() => { messageOverride = { hash: commit.hash, mode: 'markdown' }; }}
-            >{t('details.viewMarkdown')}</button>
-            <button
-              class:active={messageMode === 'plain'}
-              onclick={() => { messageOverride = { hash: commit.hash, mode: 'plain' }; }}
-            >{t('details.viewPlain')}</button>
-          </div>
-        {/if}
-        {#if messageHasMarkdown && messageMode === 'markdown'}
-          <div class="message-markdown">
-            <Markdown text={messageText} />
-          </div>
-        {:else}
+        <div class="message-header">
           <div class="message-subject"><LinkifiedText text={commit.subject} /></div>
-          {#if commit.body}
-            <div class="message-body"><LinkifiedText text={commit.body} /></div>
+          {#if messageHasMarkdown}
+            {@const toggleLabel = t(messageMode === 'markdown' ? 'details.viewPlain' : 'details.viewMarkdown')}
+            <button
+              class="message-view-toggle"
+              aria-label={toggleLabel}
+              use:tooltip={toggleLabel}
+              onclick={() => { messageOverride = { hash: commit.hash, mode: messageMode === 'markdown' ? 'plain' : 'markdown' }; }}
+            >
+              <i class="codicon {messageMode === 'markdown' ? 'codicon-code' : 'codicon-preview'}" aria-hidden="true"></i>
+            </button>
           {/if}
+        </div>
+        {#if commit.body}
+          <div class="message-content">
+            {#if messageHasMarkdown && messageMode === 'markdown'}
+              <div class="message-markdown">
+                <Markdown text={commit.body} />
+              </div>
+            {:else}
+              <div class="message-body"><LinkifiedText text={commit.body} /></div>
+            {/if}
+          </div>
         {/if}
       </div>
     </div>
@@ -1295,7 +1295,7 @@
     gap: 2px;
   }
 
-  .tab-action-btn {
+  .tab-action-btn, .message-view-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1309,7 +1309,7 @@
     font-size: 1.25em;
   }
 
-  .tab-action-btn:hover {
+  .tab-action-btn:hover, .message-view-toggle:hover {
     background: rgba(128, 128, 128, 0.2);
     color: var(--text-primary);
   }
@@ -1617,41 +1617,43 @@
     border-color: rgba(0, 0, 0, 0.08);
   }
 
+  .message-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
   .message-subject {
-    font-weight: 700;
-    font-size: 1.15em;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 600;
+    font-size: 1.2em;
     line-height: 1.4;
+  }
+
+  .message-content {
+    margin: 16px -16px 0;
+    padding: 16px 16px 0;
+    border-top: 1px solid var(--vscode-panel-border);
   }
 
   .message-body {
     color: var(--text-primary);
     white-space: pre-wrap;
     line-height: 1.6;
-    margin-top: 10px;
     font-family: var(--vscode-editor-font-family, monospace);
   }
 
   .message-view-toggle {
-    display: flex;
-    gap: 2px;
-    margin-bottom: 14px;
-  }
-  .message-view-toggle button {
-    padding: 2px 8px;
-    font-size: 11px;
+    flex-shrink: 0;
+    font-size: 1em;
     border: 1px solid var(--vscode-panel-border);
-    background: transparent;
-    color: var(--vscode-descriptionForeground);
-    cursor: pointer;
-    border-radius: 3px;
-  }
-  .message-view-toggle button.active {
-    background: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-activeBackground));
-    color: var(--vscode-foreground);
+    border-radius: 5px;
   }
   .message-markdown {
     font-size: var(--vscode-font-size, 13px);
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   /* ── Changes tab ── */

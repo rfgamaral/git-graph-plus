@@ -16,6 +16,14 @@ describe('hasMarkdown', () => {
 
   it.each([
     ['heading', '# Add profile page'],
+    ['setext heading', 'Heading\n==='],
+    ['HTML image', '<img src="https://example.com/image.png">'],
+    ['HTML heading', '<h1>Heading</h1>'],
+    ['HTML unordered list', '<ul><li>Item</li></ul>'],
+    ['HTML ordered list', '<ol><li>Item</li></ol>'],
+    ['HTML link', '<a href="https://example.com">Read more</a>'],
+    ['footnote', 'Text[^a]\n\n[^a]: Note.'],
+    ['tilde fence', '~~~js\nconst x = 1;\n~~~'],
     ['fenced code', 'Usage:\n\n```ts\nconst x = 1;\n```'],
     ['inline code', 'Call `getUser()` first'],
     ['blockquote', '> note: best-effort only'],

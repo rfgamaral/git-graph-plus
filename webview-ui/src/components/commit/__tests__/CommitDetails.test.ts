@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/svelte';
 import CommitDetails from '../CommitDetails.svelte';
@@ -1453,11 +1455,12 @@ describe('CommitDetails — markdown toggle', () => {
     i18n.setLocale('en');
   });
 
-  it('renders markdown by default when the message has markdown (bold subject becomes <strong>)', () => {
+  it('keeps the subject separate while rendering the body as Markdown', () => {
     const { container } = render(CommitDetails, {
       commit: commit({ subject: '**bold** subject', body: '- one\n- two', parents: [] }),
     });
-    expect(container.querySelector('.message-section strong')?.textContent).toBe('bold');
+    expect(container.querySelector('.message-subject')?.textContent).toBe('**bold** subject');
+    expect(container.querySelector('.message-content ul')).not.toBeNull();
   });
 
   it('renders inline code with markup characters without exposing HTML entities', () => {
@@ -1466,7 +1469,7 @@ describe('CommitDetails — markdown toggle', () => {
       commit: commit({ body: `- \`${snippet}\``, parents: [] }),
     });
 
-    expect(container.querySelector('.message-section .md-codespan')?.textContent).toBe(snippet);
+    expect(container.querySelector('.message-section code')?.textContent).toBe(snippet);
     expect(container.querySelector('.message-section if')).toBeNull();
   });
 
@@ -1475,26 +1478,31 @@ describe('CommitDetails — markdown toggle', () => {
       commit: commit({ body: '- getEnumByCode("250")', parents: [] }),
     });
 
-    expect(container.querySelector('.message-section .md-li')?.textContent?.trim())
+    expect(container.querySelector('.message-section li')?.textContent?.trim())
       .toBe('getEnumByCode("250")');
   });
 
   it('switches to plain text when the Plain toggle is clicked', async () => {
-    const { container, getByText } = render(CommitDetails, {
+    const { container, getByRole } = render(CommitDetails, {
       commit: commit({ subject: '**bold** subject', body: '- one\n- two', parents: [] }),
     });
-    await fireEvent.click(getByText('Plain Text'));
-    expect(container.querySelector('.message-section strong')).toBeNull();
-    expect(container.querySelector('.message-section')?.textContent).toContain('**bold**');
+    const toggle = getByRole('button', { name: 'Show plain text' });
+    expect(container.querySelector('.message-header')?.contains(toggle)).toBe(true);
+    expect(toggle.querySelector('.codicon-code')).not.toBeNull();
+    await fireEvent.click(toggle);
+    expect(container.querySelector('.message-body')?.textContent).toBe('- one\n- two');
+    expect(container.querySelector('.message-markdown')).toBeNull();
+    expect(getByRole('button', { name: 'Show Markdown' }).querySelector('.codicon-preview')).not.toBeNull();
   });
 
   it('switches back to markdown when the Markdown toggle is clicked', async () => {
-    const { container, getByText } = render(CommitDetails, {
+    const { container, getByRole } = render(CommitDetails, {
       commit: commit({ subject: '**bold** subject', body: '- one\n- two', parents: [] }),
     });
-    await fireEvent.click(getByText('Plain Text'));
-    await fireEvent.click(getByText('Markdown'));
-    expect(container.querySelector('.message-section strong')?.textContent).toBe('bold');
+    await fireEvent.click(getByRole('button', { name: 'Show plain text' }));
+    await fireEvent.click(getByRole('button', { name: 'Show Markdown' }));
+    expect(container.querySelector('.message-subject')?.textContent).toBe('**bold** subject');
+    expect(container.querySelector('.message-content ul')).not.toBeNull();
   });
 
   it('hides the toggle and shows plain text when the message has no markdown', () => {

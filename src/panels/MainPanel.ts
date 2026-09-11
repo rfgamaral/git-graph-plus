@@ -13,6 +13,7 @@ import { resolveGraphColors } from '../git/graph-colors';
 import { triggerVSCodeGitAuth } from '../git/vscode-git-bridge';
 import { FileWatcher } from '../services/file-watcher';
 import { AvatarCache } from '../services/avatar-cache';
+import { loadGitHubImage } from '../services/github-image';
 import { resolveGitDirs, shouldRefreshGraph } from '../services/file-watcher-helpers';
 import { RepoDiscoveryService, RepoInfo } from '../services/repo-discovery';
 import type { WebviewMessage, ModalDefaults } from '../utils/message-bus';
@@ -851,6 +852,13 @@ export class MainPanel {
           if (message.payload?.returnFocus) {
             this.panel.reveal(this.panel.viewColumn, false);
           }
+          break;
+        }
+        case 'getMarkdownImage': {
+          const { url, requestId } = message.payload ?? {};
+          if (typeof url !== 'string' || typeof requestId !== 'string') break;
+          const dataUrl = await loadGitHubImage(url);
+          this.post({ type: 'markdownImage', payload: { url, requestId, dataUrl } });
           break;
         }
         case 'openExternalUrl': {
@@ -2073,7 +2081,7 @@ export class MainPanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data: https:; font-src ${webview.cspSource};">
   <link rel="stylesheet" href="${codiconUri}">
   <link rel="stylesheet" href="${styleUri}">
   <title>Git Graph+</title>

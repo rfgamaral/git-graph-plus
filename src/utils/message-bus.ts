@@ -131,11 +131,13 @@ export type WebviewMessage =
   | { type: 'getUncommittedFileDiff'; payload: { file: string; staged: boolean } }
   | { type: 'getMultiCommitSections'; payload: { hashes: string[] } }
   | { type: 'getAvatar'; payload: { email: string; size: number } }
+  | { type: 'getMarkdownImage'; payload: { url: string; requestId: string } }
   | { type: 'openExternalUrl'; payload: { url: string } }
   | { type: 'openExtensionSettings' };
 
 // Messages from Extension → Webview
 export type ExtensionMessage =
+  | { type: 'markdownImage'; payload: { url: string; requestId: string; dataUrl: string | null } }
   | { type: 'showBranch'; payload: { name: string } }
   | { type: 'setAlwaysShowCommitDetails'; payload: { enabled: boolean } }
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }

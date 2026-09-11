@@ -13,7 +13,10 @@
   },
   "dependencies": {
     "boring-avatars-vanilla": "1.0.2",
-    "marked": "^12.0.2",
+    "dompurify": "3.4.15",
+    "marked": "18.0.12",
+    "marked-alert": "2.1.2",
+    "marked-footnote": "1.4.0",
     "shiki": "^1.0.0"
   },
   "devDependencies": {

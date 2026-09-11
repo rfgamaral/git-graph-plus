@@ -11,8 +11,11 @@
  * toggle.
  */
 const MARKDOWN_PATTERNS: RegExp[] = [
+  /<\/?(?:h[1-6]|p|a|strong|b|em|i|del|s|code|pre|blockquote|ul|ol|li|hr|table|thead|tbody|tfoot|tr|th|td|img|br|div|span|sup|sub|section|details|summary|input|kbd|samp|dl|dt|dd|abbr)(?=[\s/>])/i,
+  /^\[\^[^\]\n]+\]:/m,
+  /^.+\n(?:={3,}|-{3,})\s*$/m,
   /^#{1,6}\s+\S/m, // # heading
-  /```/, // ``` fenced code block
+  /(?:```|~~~)/, // ``` fenced code block
   /`[^`\n]+`/, // `inline code`
   /^\s*>\s+\S/m, // > blockquote
   /^\s*[-*+]\s+\S/m, // - bullet list (incl. task lists)

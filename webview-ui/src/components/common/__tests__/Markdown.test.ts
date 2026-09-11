@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// @vitest-environment jsdom
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import Markdown from '../Markdown.svelte';
 import { commitLinkRulesStore } from '../../../lib/stores/commit-link-rules.svelte';
@@ -34,7 +36,7 @@ describe('Markdown', () => {
     const snippet = '<if test="onlyHasVideo==true">';
     const { container } = render(Markdown, { props: { text: `- \`${snippet}\`` } });
 
-    expect(container.querySelector('.md-codespan')?.textContent).toBe(snippet);
+    expect(container.querySelector('code')?.textContent).toBe(snippet);
     expect(container.querySelector('if')).toBeNull();
   });
 
@@ -43,7 +45,7 @@ describe('Markdown', () => {
       props: { text: '`&lt;script&gt;alert(1)&lt;/script&gt;`' },
     });
 
-    expect(container.querySelector('.md-codespan')?.textContent)
+    expect(container.querySelector('code')?.textContent)
       .toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(container.querySelector('script')).toBeNull();
   });
@@ -53,7 +55,7 @@ describe('Markdown', () => {
       props: { text: '- getEnumByCode("250")' },
     });
 
-    expect(container.querySelector('.md-li')?.textContent?.trim()).toBe('getEnumByCode("250")');
+    expect(container.querySelector('li')?.textContent?.trim()).toBe('getEnumByCode("250")');
   });
 
   it('decodes marked text entities exactly once', () => {
@@ -61,14 +63,14 @@ describe('Markdown', () => {
       props: { text: '- &amp;lt;script&amp;gt;' },
     });
 
-    expect(container.querySelector('.md-li')?.textContent?.trim()).toBe('&lt;script&gt;');
+    expect(container.querySelector('li')?.textContent?.trim()).toBe('&lt;script&gt;');
     expect(container.querySelector('script')).toBeNull();
   });
 
   it('renders escaped markup characters as inert text', () => {
     const { container } = render(Markdown, { props: { text: '- \\<tag\\>' } });
 
-    expect(container.querySelector('.md-li')?.textContent?.trim()).toBe('<tag>');
+    expect(container.querySelector('li')?.textContent?.trim()).toBe('<tag>');
     expect(container.querySelector('tag')).toBeNull();
   });
 
@@ -85,9 +87,9 @@ describe('Markdown', () => {
     expect(container.querySelector('blockquote')?.textContent).toContain('quoted');
   });
 
-  it('preserves single line breaks (breaks: true)', () => {
+  it('reflows single line breaks', () => {
     const { container } = render(Markdown, { props: { text: 'line1\nline2' } });
-    expect(container.querySelector('br')).not.toBeNull();
+    expect(container.querySelector('br')).toBeNull();
   });
 
   it('routes markdown link clicks through openExternalUrl', () => {
@@ -112,18 +114,20 @@ describe('Markdown', () => {
     expect(link.getAttribute('href')).toBe('https://example.com');
   });
 
-  it('renders an image as a link (CSP blocks external images)', () => {
-    const { container } = render(Markdown, { props: { text: '![alt "x"](https://example.com/x.png)' } });
-    const link = container.querySelector('a') as HTMLAnchorElement;
-    expect(link.getAttribute('href')).toBe('https://example.com/x.png');
-    expect(link.textContent).toBe('alt "x"');
-    expect(container.querySelector('img')).toBeNull();
+  it('renders responsive HTTPS images with safe loading attributes', () => {
+    const { container } = render(Markdown, { text: '![alt "x"](https://example.com/x.png)' });
+    const image = container.querySelector('img')!;
+    expect(image.getAttribute('src')).toBe('https://example.com/x.png');
+    expect(image.getAttribute('alt')).toBe('alt "x"');
+    expect(image.getAttribute('loading')).toBe('lazy');
+    expect(image.getAttribute('referrerpolicy')).toBe('no-referrer');
   });
 
-  it('escapes raw HTML instead of executing it', () => {
-    const { container } = render(Markdown, { props: { text: '<img src=x onerror=alert(1)>' } });
-    expect(container.querySelector('img')).toBeNull();
-    expect(container.textContent).toContain('<img');
+  it('sanitizes raw HTML and blocks unsafe image URLs', () => {
+    const { container } = render(Markdown, { text: '<script>alert(1)</script><iframe src="https://example.com"></iframe><img src="http://example.com/x" onerror="alert(1)" srcset="https://example.com/x 2x"><img src="data:image/svg+xml,bad"><div style="position:fixed">Safe</div>' });
+    expect(container.querySelector('script, iframe, [onerror], [srcset], [style]')).toBeNull();
+    expect(container.querySelectorAll('img[src]')).toHaveLength(0);
+    expect(container.textContent).toContain('Safe');
   });
 
   it('does not forward non-http(s) link schemes to openExternalUrl', () => {
@@ -138,7 +142,77 @@ describe('Markdown', () => {
   it('autolinks issue references via linkify in plain text', () => {
     commitLinkRulesStore.set([{ pattern: '#(\\d+)', url: 'https://gh/issues/$1' }]);
     const { container } = render(Markdown, { props: { text: 'fix #12' } });
-    const link = container.querySelector('a.commit-link') as HTMLAnchorElement;
+    const link = container.querySelector('a[href]') as HTMLAnchorElement;
     expect(link?.getAttribute('href')).toBe('https://gh/issues/12');
   });
+  it('preserves explicit Markdown line breaks', () => {
+    const { container } = render(Markdown, { text: 'one  \ntwo' });
+    expect(container.querySelector('br')).not.toBeNull();
+  });
+
+  it.each(['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'])('renders a %s alert with formatted content', (type) => {
+    const { container } = render(Markdown, { text: `> [!${type}]\n> Some **bold** text.` });
+    const alert = container.querySelector(`.markdown-alert-${type.toLowerCase()}`)!;
+    expect(alert.querySelector('.codicon')).not.toBeNull();
+    expect(alert.querySelector('strong')?.textContent).toBe('bold');
+    expect(alert.textContent).not.toContain('[!');
+  });
+
+  it('renders aligned tables, HTML images, and disabled task checkboxes', () => {
+    const { container } = render(Markdown, { text: '| Before | After |\n| :--- | ---: |\n| <img src="https://example.com/a.png" width="200" height="100" alt="Before"> | ~~removed~~ |\n\n- [x] Done\n- [ ] Pending' });
+    expect(container.querySelector('.markdown-table table')).not.toBeNull();
+    expect(container.querySelector('td')?.getAttribute('align')).toBe('left');
+    expect(container.querySelectorAll('td')[1].getAttribute('align')).toBe('right');
+    expect(container.querySelector('td img')?.getAttribute('width')).toBe('200');
+    expect(container.querySelector('del')?.textContent).toBe('removed');
+    const inputs = container.querySelectorAll<HTMLInputElement>('input');
+    expect(inputs).toHaveLength(2);
+    expect([...inputs].every(input => input.disabled)).toBe(true);
+    expect(inputs[0].checked).toBe(true);
+    expect(inputs[1].checked).toBe(false);
+  });
+
+  it('navigates footnotes locally and preserves accessible references', () => {
+    const { container } = render(Markdown, { text: 'First[^a b], second[^a%20b].\n\n[^a b]: First note.\n[^a%20b]: Second note.' });
+    const reference = container.querySelectorAll<HTMLAnchorElement>('sup a')[1];
+    const id = reference.getAttribute('href')!.slice(1);
+    const target = [...container.querySelectorAll<HTMLElement>('[id]')].find(element => element.id === id)!;
+    target.scrollIntoView = vi.fn();
+    reference.click();
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(target.getAttribute('tabindex')).toBe('-1');
+    expect(document.activeElement).toBe(target);
+    expect(globalThis.__postedMessages).toEqual([]);
+    const description = reference.getAttribute('aria-describedby');
+    if (description) expect([...container.querySelectorAll('[id]')].some(element => element.id === description)).toBe(true);
+    const backlink = target.querySelector<HTMLAnchorElement>('a[href^="#"]')!;
+    expect(backlink.getAttribute('href')).toBe(`#${reference.id}`);
+    reference.scrollIntoView = vi.fn();
+    backlink.click();
+    expect(reference.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    expect(document.activeElement).toBe(reference);
+  });
+
+  it('does not linkify code or nested links', () => {
+    commitLinkRulesStore.set([{ pattern: '#(\\d+)', url: 'https://gh/issues/$1' }]);
+    const { container } = render(Markdown, { text: '`#12` [#12](https://example.com) #12' });
+    expect(container.querySelector('code a, a a')).toBeNull();
+    expect(container.querySelectorAll('a')).toHaveLength(2);
+  });
+
+  it('handles middle-clicks through the extension', () => {
+    const { container } = render(Markdown, { text: '[Link](https://example.com)' });
+    const event = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1 });
+    container.querySelector('a')!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(globalThis.__postedMessages).toHaveLength(1);
+  });
+
+  it('isolates HTML ids and strips classes that could reuse app styling', () => {
+    const { container } = render(Markdown, { text: '<h2 id="location" class="modal-overlay">Heading</h2><a href="#location">Jump</a><input type="text" value="bad">' });
+    expect(container.querySelector('h2')?.id).toBe('user-content-location');
+    expect(container.querySelector('.modal-overlay, input')).toBeNull();
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('#user-content-location');
+  });
+
 });
