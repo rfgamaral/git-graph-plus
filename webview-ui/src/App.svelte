@@ -238,8 +238,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
           commitStore.setLoading(false);
           break;
         case 'error':
-          if (msg.payload.source === 'getLog' && pendingBranch) {
+          if (msg.payload.source === 'getLog') {
             pendingBranch = null;
+            commitStore.loadMoreFailed = true;
             commitStore.setLoadingMore(false);
           }
           uiStore.setError(msg.payload.message);

@@ -595,3 +595,106 @@ describe('CommitGraph signature icon', () => {
     uiStore.exitMultiSelect();
   });
 });
+
+describe('CommitGraph infinite scrolling', () => {
+  function history(count: number, hasMore = true): CommitGraphData {
+    return {
+      ...makeGraphData(Array.from({ length: count }, (_, i) => makeCommit(`h${i}`, `Commit ${i}`))),
+      currentLimit: count,
+      hasMore,
+    };
+  }
+
+  function requests() {
+    return globalThis.__postedMessages.map(m => m.data).filter(
+      (message): message is { type: string; payload: Record<string, unknown> } =>
+        (message as { type?: string }).type === 'getLog',
+    );
+  }
+
+  async function scroll(container: HTMLElement, top: number) {
+    const graph = container.querySelector<HTMLElement>('.commit-graph')!;
+    graph.scrollTop = top;
+    await fireEvent.scroll(graph);
+    await tick();
+    return graph;
+  }
+
+  beforeEach(() => {
+    commitStore.setLoading(false);
+    commitStore.setLoadingMore(false);
+    commitStore.loadMoreFailed = false;
+    uiStore.viewMode = 'graph';
+    uiStore.activeRepo = '/repo';
+    uiStore.loadMoreCount = 50;
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      queueMicrotask(() => callback(0));
+      return 1;
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('requests one next batch near the bottom and preserves scroll and selection', async () => {
+    commitStore.setData(history(100));
+    const { container } = render(CommitGraph);
+    await tick();
+    expect(requests()).toHaveLength(0);
+    await scroll(container, 2300);
+    expect(requests()).toHaveLength(0);
+    uiStore.selectCommit('h80');
+    await tick();
+    const graph = await scroll(container, 2400);
+    expect(requests()).toEqual([{ type: 'getLog', payload: { repo: '/repo', limit: 150, loadMore: true } }]);
+    expect(commitStore.loadingMore).toBe(true);
+    await scroll(container, 2430);
+    expect(requests()).toHaveLength(1);
+    commitStore.setData(history(150));
+    await tick();
+    expect(graph.scrollTop).toBe(2430);
+    expect(uiStore.selectedCommitHash).toBe('h80');
+    expect(requests()).toHaveLength(1);
+    await scroll(container, 3900);
+    expect(requests()).toHaveLength(2);
+    expect(requests()[1].payload.limit).toBe(200);
+  });
+
+  it('fills a short viewport and stops when history is exhausted', async () => {
+    commitStore.setData(history(5));
+    const { container } = render(CommitGraph);
+    await tick();
+    expect(requests()).toHaveLength(1);
+    commitStore.setData(history(8, false));
+    await tick();
+    await scroll(container, 100);
+    expect(requests()).toHaveLength(1);
+    expect(container.querySelector('.load-more-btn')).toBeNull();
+  });
+
+  it('does not load more while searching', async () => {
+    commitStore.setData(history(100));
+    const view = render(CommitGraph, { searchMatchedHashes: new Set(['h80']) });
+    await tick();
+    await scroll(view.container, 2400);
+    expect(requests()).toHaveLength(0);
+    await view.rerender({ searchMatchedHashes: null });
+    await tick();
+    expect(requests()).toHaveLength(1);
+  });
+
+  it('waits for the initial load to finish', async () => {
+    commitStore.setData(history(5));
+    commitStore.setLoading(true);
+    render(CommitGraph);
+    await tick();
+    expect(requests()).toHaveLength(0);
+    commitStore.setData(history(5));
+    await tick();
+    expect(requests()).toHaveLength(1);
+  });
+});

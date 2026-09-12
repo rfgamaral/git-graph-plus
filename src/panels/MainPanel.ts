@@ -448,6 +448,7 @@ export class MainPanel {
   }
 
   private async handleMessage(message: WebviewMessage): Promise<void> {
+    let logRequestSequence: number | undefined;
     try {
       switch (message.type) {
         case 'setCommitDetailsPosition': {
@@ -493,6 +494,13 @@ export class MainPanel {
           if ([message.payload.remoteFilter, message.payload.branches].some(value => value !== undefined && (!Array.isArray(value) || !value.every(item => typeof item === 'string')))) break;
           const supersededRefresh = this.refreshing;
           const seq = ++this.logSequence;
+          logRequestSequence = seq;
+          const { limit, skip, loadMore } = message.payload;
+          if ((limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit >= Number.MAX_SAFE_INTEGER))
+            || (skip !== undefined && (!Number.isSafeInteger(skip) || skip < 0))
+            || (loadMore !== undefined && typeof loadMore !== 'boolean')) {
+            throw new Error('Invalid history request');
+          }
           const gitService = this.gitService;
           const restore = this.restoreLogFilters();
           if (restore) await restore;
@@ -508,7 +516,7 @@ export class MainPanel {
           this.currentBranchFilter = effectiveBranchFilter;
           this.saveLogFilters();
           if (supersededRefresh) void this.refreshAll();
-          const logPayload = { ...message.payload, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature };
+          const logPayload = { ...message.payload, loadMore: loadMore === true, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature };
           const [allFetched, logBranches] = await Promise.all([
             gitService.log(logPayload),
             gitService.branches(),
@@ -1677,12 +1685,18 @@ export class MainPanel {
           break;
       }
     } catch (err: unknown) {
+      if (message.type === 'getLog' && logRequestSequence !== this.logSequence) return;
       // Use stderr directly for GitError (cleaner than the full "git xxx failed (exit N): ..." message)
       const errorMessage = err instanceof GitError ? formatGitError(err.stderr) : err instanceof Error ? err.message : String(err);
 
       // Detect non-git-repo errors early to avoid unnecessary follow-up git calls
       if (err instanceof GitError && /not a git repository/.test(err.stderr)) {
         this.post({ type: 'notGitRepo' });
+        return;
+      }
+
+      if (message.type === 'getLog') {
+        this.post({ type: 'error', payload: { message: errorMessage, source: message.type } });
         return;
       }
 
@@ -1929,7 +1943,7 @@ export class MainPanel {
       const refreshLimit = this.currentLimit || readInitialCommitCount();
       const remoteFilter = this.currentRemoteFilter;
       const branchFilter = this.currentBranchFilter;
-      const logArgs = { limit: refreshLimit + 1, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
+      const logArgs = { limit: refreshLimit + 1, loadMore: false, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
         const hasMore = allFetched.length > refreshLimit;

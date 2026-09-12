@@ -1662,3 +1662,41 @@ describe('App — search result highlighting', () => {
     expect(container.querySelector('.commit-row.search-dim')).not.toBeNull();
   });
 });
+
+describe('App — history loading retry', () => {
+  it('pauses automatic loading after an error until Retry is clicked', async () => {
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300);
+    try {
+      const { container } = render(App);
+      postMsg('logData', {
+        commits: [{
+          hash: 'tip', abbreviatedHash: 'tip', subject: 'Tip', body: '', parents: [], refs: [],
+          author: { name: 'A', email: 'a@x.com', date: '' },
+          committer: { name: 'A', email: 'a@x.com', date: '' },
+        }],
+        graph: [], hasMore: true, currentLimit: 100,
+      });
+      await waitFor(() => expect(commitStore.loadingMore).toBe(true));
+      const requests = () => globalThis.__postedMessages.filter(m =>
+        (m.data as { type?: string }).type === 'getLog');
+      const count = requests().length;
+      postMsg('error', { source: 'getLog', message: 'Temporary history failure' });
+      await waitFor(() => expect(container.querySelector('.load-more-btn')?.textContent).toContain('Retry'));
+      expect(commitStore.loadingMore).toBe(false);
+      expect(commitStore.loadMoreFailed).toBe(true);
+      await fireEvent(window, new Event('resize'));
+      expect(requests()).toHaveLength(count);
+      await fireEvent.click(container.querySelector<HTMLButtonElement>('.load-more-btn')!);
+      expect(requests()).toHaveLength(count + 1);
+      expect(commitStore.loadingMore).toBe(true);
+      expect(commitStore.loadMoreFailed).toBe(false);
+      expect((requests().at(-1)!.data as { payload: { loadMore: boolean } }).payload.loadMore).toBe(true);
+      postMsg('logData', { commits: [], graph: [], hasMore: false, currentLimit: 150 });
+      await waitFor(() => expect(commitStore.loadingMore).toBe(false));
+      expect(requests()).toHaveLength(count + 1);
+    } finally {
+      cleanup();
+      height.mockRestore();
+    }
+  });
+});

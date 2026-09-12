@@ -9,6 +9,7 @@ class CommitStore {
   commitLeftMargin = $state<number[]>([]);
   loading = $state(false);
   loadingMore = $state(false);
+  loadMoreFailed = $state(false);
   hasMore = $state(false);
   currentLimit = $state(0);
   notGitRepo = $state(false);
@@ -40,11 +41,16 @@ class CommitStore {
     if (data.currentLimit) this.currentLimit = data.currentLimit;
     this.loading = false;
     this.loadingMore = false;
+    this.loadMoreFailed = false;
     this.notGitRepo = false;
   }
 
   setLoading(value: boolean) {
     this.loading = value;
+    if (value) {
+      this.loadingMore = false;
+      this.loadMoreFailed = false;
+    }
   }
 
   setLoadingMore(value: boolean) {

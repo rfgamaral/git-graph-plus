@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { existsSync } from 'fs';
-import { writeFile, unlink } from 'fs/promises';
+import { readFile, writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { bufferStream, BufferOverflowError } from '../utils/buffer-stream';
@@ -77,6 +77,9 @@ export class GitService {
     this.inflight.set(key, p);
     return p;
   }
+
+  private logCache: { key: string; commits: Commit[] } | undefined;
+  private logSequence = 0;
 
   constructor(private repoPath: string) {}
 
@@ -474,7 +477,21 @@ export class GitService {
     });
   }
 
+  private async logSnapshot(): Promise<string> {
+    return JSON.stringify(await Promise.all([
+      this.exec(['for-each-ref', '--format=%(HEAD)%(refname)%00%(objectname)']),
+      this.exec(['rev-parse', '--revs-only', 'HEAD']),
+      readFile(join(resolveGitDirs(this.repoPath).commonDir, 'shallow'), 'utf8').catch((err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return '';
+        throw err;
+      }),
+    ]));
+  }
+
   async log(options?: LogOptions): Promise<Commit[]> {
+    const seq = ++this.logSequence;
+    const cacheEnabled = options?.loadMore !== undefined && !options.skip && !!options.limit;
+    const snapshot = cacheEnabled ? await this.logSnapshot() : undefined;
     // %G? is appended after %b only when signature verification is requested,
     // since it forces GPG verification of every commit in the log (slow on
     // large repos). %b never contains a NUL so the trailing column is unambiguous.
@@ -513,14 +530,6 @@ export class GitService {
       '--author-date-order'
     );
 
-    if (options?.limit) {
-      args.push(`--max-count=${options.limit}`);
-    }
-
-    if (options?.skip) {
-      args.push(`--skip=${options.skip}`);
-    }
-
     if (options?.branch) {
       this.assertSafeRef(options.branch, 'log');
       args.push(options.branch);
@@ -554,11 +563,28 @@ export class GitService {
       }
     }
 
+    const cacheKey = JSON.stringify([args, snapshot]);
+    const cached = cacheEnabled && options?.loadMore && this.logCache?.key === cacheKey
+      ? this.logCache.commits.slice(0, options.limit)
+      : [];
+    const remaining = options?.limit ? options.limit - cached.length : undefined;
+    if (remaining !== undefined) args.push(`--max-count=${remaining}`);
+    const skip = cached.length || options?.skip;
+    if (skip) args.push(`--skip=${skip}`);
+
     const [raw, remoteNames] = await Promise.all([
-      this.exec(args),
+      remaining === 0 ? Promise.resolve('') : this.exec(args),
       this.getRemoteNames(),
     ]);
-    const commits = parseLog(raw, remoteNames);
+    const history = cached.concat(parseLog(raw, remoteNames));
+    if (cacheEnabled) {
+      const unchanged = snapshot === await this.logSnapshot();
+      if (!unchanged && cached.length > 0) return this.log({ ...options, loadMore: false });
+      if (seq === this.logSequence) {
+        this.logCache = unchanged ? { key: cacheKey, commits: history } : undefined;
+      }
+    }
+    const commits = [...history];
 
     // Insert stash commits into the graph as separate rows
     if (stashes.length > 0) {

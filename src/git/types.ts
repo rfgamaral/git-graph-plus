@@ -165,6 +165,7 @@ export interface LogOptions {
   limit?: number;
   all?: boolean;
   skip?: number;
+  loadMore?: boolean;
   sortOrder?: 'author-date' | 'date' | 'topological';
   remoteFilter?: string[]; // undefined = all; ['local'] = local only; ['origin'] = origin only; etc.
   /** When true, include `%G?` in the log format so each commit carries a

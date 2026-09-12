@@ -367,7 +367,7 @@
   let scrollTop = $state(0);
   // Hovered row hash, so the row and its pinned meta overlay highlight as one row.
   let hoveredHash = $state<string | null>(null);
-  let viewportHeight = $state(600);
+  let viewportHeight = $state(0);
   // Trail of commits visited during the current run of Ctrl/Cmd jumps, so reversing
   // a jump returns to where we came from. Cleared by any non-jump navigation.
   let navPath = $state<string[]>([]);
@@ -573,6 +573,26 @@
   });
 
   let totalHeight = $derived(displayCommits.length * ROW_HEIGHT);
+
+  function loadMore() {
+    if (commitStore.loading || commitStore.loadingMore || !commitStore.hasMore || isSearchActive) return;
+    commitStore.loadMoreFailed = false;
+    commitStore.setLoadingMore(true);
+    vscode.postMessage({ type: 'getLog', payload: {
+      repo: uiStore.activeRepo || undefined,
+      limit: commitStore.currentLimit + uiStore.loadMoreCount,
+      loadMore: true,
+    } });
+  }
+
+  $effect(() => {
+    if (container && viewportHeight > 0 && uiStore.viewMode === 'graph'
+      && !isSearchActive && !commitStore.loading && !commitStore.loadingMore
+      && !commitStore.loadMoreFailed && commitStore.hasMore
+      && scrollTop + viewportHeight * 2 >= totalHeight) {
+      untrack(loadMore);
+    }
+  });
 
   let naturalGraphWidth = $derived.by(() => {
     if (displayLeftMargin.length === 0) return 30;
@@ -1738,21 +1758,18 @@
     </div>
 
     {#if commitStore.hasMore && !isSearchActive}
-      <div class="load-more-row">
+      <div class="load-more-row" aria-live="polite">
         <button
           class="load-more-btn"
           disabled={commitStore.loadingMore}
-          onclick={() => {
-            commitStore.setLoadingMore(true);
-            vscode.postMessage({ type: 'getLog', payload: { repo: uiStore.activeRepo || undefined, limit: commitStore.currentLimit + uiStore.loadMoreCount } });
-          }}
+          onclick={loadMore}
         >
           {#if commitStore.loadingMore}
             <span class="spinner"></span>
           {:else}
             <i class="codicon codicon-chevron-down"></i>
           {/if}
-          {t('graph.loadMore')}
+          {commitStore.loadingMore ? t('graph.loading') : commitStore.loadMoreFailed ? 'Retry' : t('graph.loadMore')}
         </button>
       </div>
     {/if}

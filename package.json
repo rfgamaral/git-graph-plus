@@ -405,13 +405,13 @@
           "type": "integer",
           "default": 200,
           "minimum": 1,
-          "markdownDescription": "Number of commits loaded when the graph first renders (and on refresh). Lower this to speed up loading in very large repositories; raise it to see more history without clicking **Load more**."
+          "markdownDescription": "Number of commits loaded when the graph first renders. Older commits load automatically as you scroll."
         },
         "gitGraphPlus.loadMoreCommitCount": {
           "type": "integer",
           "default": 50,
           "minimum": 1,
-          "markdownDescription": "Number of additional commits fetched each time the **Load more commits** button is clicked."
+          "markdownDescription": "Number of additional commits fetched when scrolling near the bottom of the graph or clicking **Load more commits**."
         },
         "gitGraphPlus.interactiveRebase.mode": {
           "type": "string",

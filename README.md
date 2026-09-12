@@ -180,7 +180,7 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 | `gitGraphPlus.autoRefresh`             | `true`        | Auto-refresh on repository changes                       |
 | `gitGraphPlus.timeout`                 | `60`          | Max time (seconds) to wait for a Git command before abort |
 | `gitGraphPlus.initialCommitCount`      | `200`         | Commits loaded on first render / refresh (lower = faster in huge repos) |
-| `gitGraphPlus.loadMoreCommitCount`     | `50`          | Extra commits fetched per **Load more commits** click    |
+| `gitGraphPlus.loadMoreCommitCount`     | `50`          | Extra commits fetched when scrolling near the bottom    |
 | `gitGraphPlus.locale`                  | `auto`        | UI language (`auto`, `en`; English only)                |
 | `gitGraphPlus.graphSortOrder`          | `topological` | Commit sort order (`topological`, `date`, `author-date`) |
 | `gitGraphPlus.interactiveRebase.mode`  | `ui`          | Interactive rebase mode (`ui` visual editor, `classic` `git rebase -i` in a terminal) |
