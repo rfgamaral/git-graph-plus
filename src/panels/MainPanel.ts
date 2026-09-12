@@ -5,7 +5,7 @@ import { GitService, GitError } from '../git/git-service';
 import { formatGitError, isAuthFailure, transportFromRemoteUrl } from '../git/git-error-formatter';
 import { splitUpstreamRef } from '../git/git-parser';
 import { samePath } from '../utils/path';
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readCommitDetailsPosition, readAuthorColors } from '../utils/config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readGraphLaneSpacing, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readCommitDetailsPosition, readAuthorColors } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
@@ -254,6 +254,9 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.authorColors')) {
           this.post({ type: 'authorColors', payload: { colors: readAuthorColors() } });
         }
+        if (e.affectsConfiguration('gitGraphPlus.graphLaneSpacing')) {
+          this.post({ type: 'setGraphLaneSpacing', payload: { spacing: readGraphLaneSpacing() } });
+        }
         if (e.affectsConfiguration('gitGraphPlus.graphColors')) {
           this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
         }
@@ -279,6 +282,7 @@ export class MainPanel {
     this.post({ type: 'setDefaults', payload: this.readModalDefaults() });
     this.post({ type: 'setBadgeBarThickness', payload: { width: this.readBadgeBarWidth() } });
     this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
+    this.post({ type: 'setGraphLaneSpacing', payload: { spacing: readGraphLaneSpacing() } });
     this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
     this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
     this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });

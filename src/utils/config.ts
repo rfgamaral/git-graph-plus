@@ -37,6 +37,10 @@ export function readLoadMoreCommitCount(): number {
   return readPositiveIntSetting('loadMoreCommitCount', DEFAULT_LOAD_MORE_COMMIT_COUNT);
 }
 
+export function readGraphLaneSpacing(): number {
+  return readPositiveIntSetting('graphLaneSpacing', 13);
+}
+
 /**
  * Reads `gitGraphPlus.interactiveRebase.mode` — whether interactive rebase
  * opens the GUI editor (`ui`, default) or runs classic `git rebase -i` in the

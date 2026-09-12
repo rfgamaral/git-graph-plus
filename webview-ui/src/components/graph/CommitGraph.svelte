@@ -360,7 +360,7 @@
   // stepping with the arrow keys, so context above/below the selection stays visible.
   const KEYBOARD_NAV_SCROLL_MARGIN_ROWS = 3;
   // SourceGit uses unitWidth=12 for X coordinates, we scale them up for display
-  const X_SCALE = 1.05; // multiply SourceGit X coords by this for pixel positions
+  const xScale = $derived(uiStore.graphLaneSpacing / 12);
   const BUFFER_ROWS = 20; // Larger buffer to keep lines visible during scroll
 
   let container: HTMLDivElement | undefined = $state();
@@ -598,7 +598,7 @@
     if (displayLeftMargin.length === 0) return 30;
     let maxMargin = 0;
     for (const m of displayLeftMargin) if (m > maxMargin) maxMargin = m;
-    return Math.ceil(maxMargin * X_SCALE) + 4;
+    return Math.ceil(maxMargin * xScale) + 4;
   });
 
   let graphWidth = $derived(Math.min(naturalGraphWidth, maxGraphWidth));
@@ -660,7 +660,7 @@
   let visibleDots = $derived(displayDots.slice(startIndex, endIndex));
 
   function laneX(col: number): number {
-    return col * X_SCALE;
+    return col * xScale;
   }
 
   // Coalesce scroll events into one update per animation frame. High-refresh
@@ -1601,7 +1601,7 @@
               }
             }}
           >
-            <div class="col-message" style="padding-left: {Math.min((displayLeftMargin[index] ?? 0) * X_SCALE + 4, maxGraphWidth)}px;">
+            <div class="col-message" style="padding-left: {Math.min((displayLeftMargin[index] ?? 0) * xScale + 4, maxGraphWidth)}px;">
               {#if currentBranchLocalOnly.has(commit.hash)}
                 <span class="local-dot" use:tooltip={t('graph.notPushed')}></span>
               {:else if currentBranchRemoteAhead.has(commit.hash)}

@@ -43,6 +43,7 @@ class UiStore {
   homeDir = $state('');
   operating = $state<string | null>(null);
   badgeBarWidth = $state(4);
+  graphLaneSpacing = $state(13);
   loadMoreCount = $state(50);
   interactiveRebaseMode = $state<InteractiveRebaseMode>('ui');
   // True while a file is selected in the commit-details panel. Owned (synced)

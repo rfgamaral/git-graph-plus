@@ -488,6 +488,12 @@
           },
           "markdownDescription": "Assign fixed colors to branches by name pattern in the graph. Each rule is `{ \"pattern\": <regex>, \"color\": <hex> }`; the first matching rule wins. Branches matching no rule keep an automatic color. Patterns are regular expressions and match anywhere in the name unless anchored (use `^main$` for an exact match)."
         },
+        "gitGraphPlus.graphLaneSpacing": {
+          "type": "integer",
+          "default": 13,
+          "minimum": 1,
+          "description": "Horizontal distance in pixels between graph lanes"
+        },
         "gitGraphPlus.graphColors": {
           "type": "array",
           "items": {

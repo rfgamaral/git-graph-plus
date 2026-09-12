@@ -206,6 +206,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'authorColor':
           authorColorsStore.receive(msg.payload.email, msg.payload.color);
           break;
+        case 'setGraphLaneSpacing':
+          uiStore.graphLaneSpacing = msg.payload.spacing;
+          break;
         case 'setGraphColors':
           graphColorsStore.set(msg.payload.colors);
           break;

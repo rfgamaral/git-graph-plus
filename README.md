@@ -189,6 +189,7 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 | `gitGraphPlus.autoDetectRepoLinks`     | `true`        | Auto-link `#123` issues (github.com/gitlab.com) and `!123` GitLab MRs from the `origin` remote |
 | `gitGraphPlus.branchBadgeBarThickness` | `thin`        | Branch badge bar thickness (`thin`, `medium`, `thick`)   |
 | `gitGraphPlus.branchColors`            | `[]`          | Fixed branch colors by name pattern (regex → hex)        |
+| `gitGraphPlus.graphLaneSpacing`        | `13`          | Horizontal distance in pixels between graph lanes      |
 | `gitGraphPlus.graphColors`             | 12 colors     | Color palette auto-assigned to graph rails (hex strings) |
 
 ### Operation Defaults
