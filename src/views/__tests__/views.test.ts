@@ -272,7 +272,7 @@ describe('StatusBarManager', () => {
     const item = createFn.mock.results.at(-1)!.value;
     expect(item.text).toBe('$(git-merge)');
     expect(item.command).toBe('gitGraphPlus.open');
-    expect(item.tooltip).toContain('Git Graph+');
+    expect(item.tooltip).toBe('Git Graph+ - Click to open');
     expect(item.show).toHaveBeenCalled();
     mgr.dispose();
     expect(item.dispose).toHaveBeenCalled();

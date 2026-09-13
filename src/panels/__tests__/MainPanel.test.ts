@@ -83,7 +83,7 @@ vi.mock('vscode', () => {
       fs: { writeFile: vi.fn(async () => {}) },
     },
     commands: { executeCommand: vi.fn() },
-    l10n: { t: (k: string) => k },
+    l10n: { t: (message: string, ...args: Array<string | number | boolean>) => message.replace(/\{(\d+)\}/g, (placeholder, index) => args[Number(index)] === undefined ? placeholder : String(args[Number(index)])) },
     env: { language: 'en', clipboard: { writeText: vi.fn() } },
     Uri: {
       joinPath: () => ({}),
@@ -442,6 +442,21 @@ describe('MainPanel error handling', () => {
     expect(postedOfType('error').length).toBeGreaterThan(0);
   });
 
+  it('includes the branch and original error in a failed publication message', async () => {
+    H.git.createBranch = vi.fn(async () => {});
+    H.git.publishBranch = vi.fn(async () => { throw new Error('remote rejected $&'); });
+    await dispatch({ type: 'createBranch', payload: { name: 'feature/test', publish: true } });
+    expect(postedOfType('error').at(-1)?.payload?.message).toBe("Branch created, but publishing 'feature/test' failed: remote rejected $&");
+    expect(window.showInformationMessage).toHaveBeenCalledWith("Branch 'feature/test' created");
+  });
+
+  it('preserves the failure reason in a follow-up push error', async () => {
+    H.git.pushCurrentBranch = vi.fn(async () => { throw new Error('permission denied'); });
+    await dispatch({ type: 'merge', payload: { branch: 'feature/test', pushAfter: true } });
+    expect(postedOfType('error').at(-1)?.payload?.message).toBe('Merge succeeded, but the follow-up push failed: permission denied');
+    expect(window.showInformationMessage).toHaveBeenCalledWith("Merged 'feature/test'");
+  });
+
   it('posts conflictData when a failing mutation leaves conflicted files', async () => {
     H.git.merge.mockRejectedValue(new GitError('CONFLICT', 1, ['merge']));
     H.git.getConflictFiles.mockResolvedValue(['a.ts']);
@@ -458,6 +473,18 @@ describe('MainPanel error handling', () => {
 // sequence guard. The rest of the ~80 message cases mirror `merge` and aren't
 // worth duplicating.
 describe('MainPanel orchestration logic', () => {
+  it.each([false, true])('uses a readable stash notification with drop=%s', async (drop) => {
+    H.git.stashApply = vi.fn(async () => {});
+    await dispatch({ type: 'stashApply', payload: { index: 0, drop } });
+    expect(window.showInformationMessage).toHaveBeenCalledWith(drop ? 'Stash popped' : 'Stash applied');
+  });
+
+  it('formats nested commit counts in success notifications', async () => {
+    H.git.cherryPick = vi.fn(async () => {});
+    await dispatch({ type: 'cherryPick', payload: { commits: ['abc1234', 'def5678'] } });
+    expect(window.showInformationMessage).toHaveBeenCalledWith('Cherry-picked 2 commits');
+  });
+
   it('fastForward (checkout path) stashes, checks out, ff-merges, then pops', async () => {
     await dispatch({ type: 'fastForward', payload: { local: 'main', remote: 'origin/main', stash: true } });
     expect(H.git.stashSave).toHaveBeenCalled();
@@ -471,7 +498,7 @@ describe('MainPanel orchestration logic', () => {
     H.git.stashPop.mockRejectedValueOnce(new Error('pop conflict'));
     await dispatch({ type: 'fastForward', payload: { local: 'main', remote: 'origin/main', stash: true } });
     const err = postedOfType('error').at(-1)!;
-    expect(err.payload!.message).toBe('stashPopAfterFastForwardFailed');
+    expect(err.payload!.message).toBe("Fast-forward succeeded, but failed to restore stashed changes. Use 'git stash pop' manually.");
   });
 
   it('pull with stash pops afterwards and surfaces a failed pop', async () => {
@@ -480,13 +507,13 @@ describe('MainPanel orchestration logic', () => {
     await dispatch({ type: 'pull', payload: { stash: true } });
     expect(H.git.stashSave).toHaveBeenCalled();
     expect(H.git.pull).toHaveBeenCalled();
-    expect(postedOfType('error').at(-1)!.payload!.message).toBe('stashPopAfterPullFailed');
+    expect(postedOfType('error').at(-1)!.payload!.message).toBe("Pull succeeded, but failed to restore stashed changes. Use 'git stash pop' manually.");
   });
 
   it('stashSave reports "no changes" when the stash count does not grow', async () => {
     H.git.stashList.mockResolvedValueOnce([]).mockResolvedValueOnce([]); // before == after
     await dispatch({ type: 'stashSave', payload: {} });
-    expect(postedOfType('error').at(-1)!.payload!.message).toBe('noChangesToStash');
+    expect(postedOfType('error').at(-1)!.payload!.message).toBe('No local changes to stash');
   });
 
   it('stashSave confirms success when a new stash entry appears', async () => {

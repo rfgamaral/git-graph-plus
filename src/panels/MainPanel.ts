@@ -676,9 +676,9 @@ export class MainPanel {
             payload: { operation: 'checkout', success: true },
           });
           const checkedOutRef = /^[0-9a-f]{40}$/i.test(message.payload.ref) ? message.payload.ref.substring(0, 7) : message.payload.ref;
-          vscode.window.showInformationMessage(vscode.l10n.t('checkedOut', checkedOutRef));
+          vscode.window.showInformationMessage(vscode.l10n.t('Checked out {0}', checkedOutRef));
           if (message.payload.stash) {
-            vscode.window.showInformationMessage(vscode.l10n.t('changesStashed'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Changes stashed'));
           }
           await this.refreshAll();
           break;
@@ -702,7 +702,7 @@ export class MainPanel {
             try {
               await this.gitService.publishBranch(message.payload.name);
             } catch (err) {
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('publishBranchFailed', message.payload.name, err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Branch created, but publishing \'{0}\' failed: {1}', message.payload.name, err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({
@@ -711,11 +711,11 @@ export class MainPanel {
           });
           vscode.window.showInformationMessage(
             message.payload.checkout
-              ? vscode.l10n.t('branchCreatedAndCheckedOut', message.payload.name)
-              : vscode.l10n.t('branchCreated', message.payload.name)
+              ? vscode.l10n.t('Switched to new branch \'{0}\'', message.payload.name)
+              : vscode.l10n.t('Branch \'{0}\' created', message.payload.name)
           );
           if (message.payload.checkout && message.payload.stash) {
-            vscode.window.showInformationMessage(vscode.l10n.t('changesStashed'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Changes stashed'));
           }
           await this.refreshAll();
           break;
@@ -742,7 +742,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'deleteBranch', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('branchDeleted', message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Branch \'{0}\' deleted', message.payload.name));
           await this.refreshAll();
           break;
         }
@@ -752,7 +752,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'deleteRemoteBranch', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('remoteBranchDeleted', message.payload.remote, message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Remote branch \'{0}/{1}\' deleted', message.payload.remote, message.payload.name));
           await this.refreshAll();
           break;
         }
@@ -762,7 +762,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'renameBranch', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('branchRenamed', message.payload.newName));
+          vscode.window.showInformationMessage(vscode.l10n.t('Branch renamed to \'{0}\'', message.payload.newName));
           await this.refreshAll();
           break;
         }
@@ -796,7 +796,7 @@ export class MainPanel {
                 try {
                   await this.gitService.stashPop(0);
                 } catch {
-                  this.post({ type: 'error', payload: { message: vscode.l10n.t('stashPopAfterFastForwardFailed') } });
+                  this.post({ type: 'error', payload: { message: vscode.l10n.t('Fast-forward succeeded, but failed to restore stashed changes. Use \'git stash pop\' manually.') } });
                 }
               }
             }
@@ -805,7 +805,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'checkout', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('fastForwarded', message.payload.local, message.payload.remote));
+          vscode.window.showInformationMessage(vscode.l10n.t('Fast-forwarded \'{0}\' to \'{1}\'', message.payload.local, message.payload.remote));
           await this.refreshAll();
           break;
         }
@@ -818,7 +818,7 @@ export class MainPanel {
             try {
               await this.gitService.deleteBranch(message.payload.branch);
             } catch (err) {
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('deleteSourceAfterMergeFailed', message.payload.branch, err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Merge succeeded, but deleting \'{0}\' failed: {1}', message.payload.branch, err instanceof Error ? err.message : String(err)) } });
             }
           }
           let pushFailed = false;
@@ -827,7 +827,7 @@ export class MainPanel {
               await this.gitService.pushCurrentBranch();
             } catch (err) {
               pushFailed = true;
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('pushAfterMergeFailed', err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Merge succeeded, but the follow-up push failed: {0}', err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({
@@ -835,9 +835,9 @@ export class MainPanel {
             payload: { operation: 'merge', success: true },
           });
           if (message.payload.pushAfter && !pushFailed) {
-            vscode.window.showInformationMessage(vscode.l10n.t('mergedAndPushed', message.payload.branch));
+            vscode.window.showInformationMessage(vscode.l10n.t('Merged \'{0}\' and pushed', message.payload.branch));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('merged', message.payload.branch));
+            vscode.window.showInformationMessage(vscode.l10n.t('Merged \'{0}\'', message.payload.branch));
           }
           await this.refreshAll();
           break;
@@ -919,7 +919,7 @@ export class MainPanel {
               await this.gitService.pushCurrentBranch({ force: 'with-lease' });
             } catch (err) {
               amendPushFailed = true;
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('pushAfterAmendFailed', err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Amend succeeded, but the follow-up push failed: {0}', err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({
@@ -927,9 +927,9 @@ export class MainPanel {
             payload: { operation: 'amendCommit', success: true },
           });
           if (message.payload.pushAfter && !amendPushFailed) {
-            vscode.window.showInformationMessage(vscode.l10n.t('commitAmendedAndPushed'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Last commit amended and pushed'));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('commitAmended'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Last commit amended'));
           }
           await this.refreshAll();
           break;
@@ -940,7 +940,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'fetch', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('fetched'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Fetch complete'));
           await this.refreshAll();
           break;
         }
@@ -955,7 +955,7 @@ export class MainPanel {
               try {
                 await this.gitService.stashPop(0);
               } catch {
-                this.post({ type: 'error', payload: { message: vscode.l10n.t('stashPopAfterPullFailed') } });
+                this.post({ type: 'error', payload: { message: vscode.l10n.t('Pull succeeded, but failed to restore stashed changes. Use \'git stash pop\' manually.') } });
               }
             }
           }
@@ -963,7 +963,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'pull', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('pulled'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Pull complete'));
           await this.refreshAll();
           break;
         }
@@ -973,7 +973,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'push', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('pushed'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Push complete'));
           await this.refreshAll();
           break;
         }
@@ -983,7 +983,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'addRemote', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('remoteAdded', message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Remote \'{0}\' added', message.payload.name));
           await this.refreshAll();
           break;
         }
@@ -993,7 +993,7 @@ export class MainPanel {
             type: 'operationComplete',
             payload: { operation: 'removeRemote', success: true },
           });
-          vscode.window.showInformationMessage(vscode.l10n.t('remoteRemoved', message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Remote \'{0}\' removed', message.payload.name));
           await this.refreshAll();
           break;
         }
@@ -1009,7 +1009,7 @@ export class MainPanel {
               pushOutcome = result.pushed ? 'pushed' : 'no-remote';
             } catch (err) {
               pushOutcome = 'failed';
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('pushAfterRebaseFailed', err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Rebase succeeded, but the follow-up push failed: {0}', err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({
@@ -1018,11 +1018,11 @@ export class MainPanel {
           });
           const onto = message.payload.onto.substring(0, 7);
           if (pushOutcome === 'pushed') {
-            vscode.window.showInformationMessage(vscode.l10n.t('rebasedAndPushed', onto));
+            vscode.window.showInformationMessage(vscode.l10n.t('Rebased onto \'{0}\' and pushed', onto));
           } else if (pushOutcome === 'no-remote') {
-            vscode.window.showInformationMessage(vscode.l10n.t('pushAfterRebaseNoRemote', onto));
+            vscode.window.showInformationMessage(vscode.l10n.t('Rebased onto \'{0}\'. Skipped push - no remote configured.', onto));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('rebased', onto));
+            vscode.window.showInformationMessage(vscode.l10n.t('Rebased onto \'{0}\'', onto));
           }
           await this.refreshAll();
           break;
@@ -1044,7 +1044,7 @@ export class MainPanel {
           await this.gitService.rebase(message.payload.target);
           this.post({ type: 'operationComplete', payload: { operation: 'rebase', success: true } });
           vscode.window.showInformationMessage(
-            vscode.l10n.t('rebasedBranchOnto', message.payload.source, message.payload.target),
+            vscode.l10n.t('Rebased {0} onto {1}', message.payload.source, message.payload.target),
           );
           await this.refreshAll();
           break;
@@ -1065,7 +1065,7 @@ export class MainPanel {
           await this.gitService.merge(message.payload.source, { noFf: true });
           this.post({ type: 'operationComplete', payload: { operation: 'merge', success: true } });
           vscode.window.showInformationMessage(
-            vscode.l10n.t('mergedBranchInto', message.payload.source, message.payload.target),
+            vscode.l10n.t('Merged {0} into {1}', message.payload.source, message.payload.target),
           );
           await this.refreshAll();
           break;
@@ -1101,9 +1101,9 @@ export class MainPanel {
           // confirmation, otherwise a generic one so the rebase never completes
           // silently.
           if (message.payload.squashCount) {
-            vscode.window.showInformationMessage(vscode.l10n.t('squashed', String(message.payload.squashCount)));
+            vscode.window.showInformationMessage(vscode.l10n.t('Squashed {0} commits', String(message.payload.squashCount)));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('interactiveRebaseComplete'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Interactive rebase complete'));
           }
           await this.refreshAll();
           break;
@@ -1127,7 +1127,7 @@ export class MainPanel {
         case 'reset': {
           await this.gitService.reset(message.payload.ref, message.payload.mode);
           this.post({ type: 'operationComplete', payload: { operation: 'reset', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('resetComplete', message.payload.ref.substring(0, 7)));
+          vscode.window.showInformationMessage(vscode.l10n.t('Reset to {0}', message.payload.ref.substring(0, 7)));
           await this.refreshAll();
           break;
         }
@@ -1137,9 +1137,9 @@ export class MainPanel {
           const afterCount = (await this.gitService.stashList()).length;
           if (afterCount > beforeCount) {
             this.post({ type: 'operationComplete', payload: { operation: 'stashSave', success: true } });
-            vscode.window.showInformationMessage(vscode.l10n.t('changesStashed'));
+            vscode.window.showInformationMessage(vscode.l10n.t('Changes stashed'));
           } else {
-            this.post({ type: 'error', payload: { message: vscode.l10n.t('noChangesToStash') } });
+            this.post({ type: 'error', payload: { message: vscode.l10n.t('No local changes to stash') } });
           }
           await this.refreshAll();
           break;
@@ -1151,14 +1151,14 @@ export class MainPanel {
             await this.gitService.stashApply(message.payload.index);
           }
           this.post({ type: 'operationComplete', payload: { operation: 'stashApply', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t(message.payload.drop ? 'stashPopped' : 'stashApplied'));
+          vscode.window.showInformationMessage(message.payload.drop ? vscode.l10n.t('Stash popped') : vscode.l10n.t('Stash applied'));
           await this.refreshAll();
           break;
         }
         case 'stashDrop': {
           await this.gitService.stashDrop(message.payload.index);
           this.post({ type: 'operationComplete', payload: { operation: 'stashDrop', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('stashDropped'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Stash dropped'));
           await this.refreshAll();
           break;
         }
@@ -1180,7 +1180,7 @@ export class MainPanel {
           );
           await this.gitService.worktreeAdd(wtPath, message.payload.branch, message.payload.newBranch);
           this.post({ type: 'operationComplete', payload: { operation: 'worktreeAdd', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('worktreeAdded', message.payload.path));
+          vscode.window.showInformationMessage(vscode.l10n.t('Worktree added at \'{0}\'', message.payload.path));
           await this.refreshAll();
           break;
         }
@@ -1191,7 +1191,7 @@ export class MainPanel {
             await this.gitService.deleteBranch(message.payload.deleteBranch, true);
           }
           this.post({ type: 'operationComplete', payload: { operation: 'worktreeRemove', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('worktreeRemoved'));
+          vscode.window.showInformationMessage(vscode.l10n.t('Worktree removed'));
           await this.refreshAll();
           break;
         }
@@ -1217,17 +1217,17 @@ export class MainPanel {
               await this.gitService.pushCurrentBranch();
             } catch (err) {
               cherryPushFailed = true;
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('pushAfterCherryPickFailed', err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Cherry-pick succeeded, but the follow-up push failed: {0}', err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({ type: 'operationComplete', payload: { operation: 'cherryPick', success: true } });
           const cherryLabel = picks.length > 1
-            ? vscode.l10n.t('nCommits', String(picks.length))
+            ? vscode.l10n.t('{0} commits', String(picks.length))
             : picks[0].substring(0, 7);
           if (message.payload.pushAfter && !message.payload.noCommit && !cherryPushFailed) {
-            vscode.window.showInformationMessage(vscode.l10n.t('cherryPickedAndPushed', cherryLabel));
+            vscode.window.showInformationMessage(vscode.l10n.t('Cherry-picked {0} and pushed', cherryLabel));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('cherryPicked', cherryLabel));
+            vscode.window.showInformationMessage(vscode.l10n.t('Cherry-picked {0}', cherryLabel));
           }
           await this.refreshAll();
           break;
@@ -1242,14 +1242,14 @@ export class MainPanel {
               await this.gitService.pushCurrentBranch();
             } catch (err) {
               revertPushFailed = true;
-              this.post({ type: 'error', payload: { message: vscode.l10n.t('pushAfterRevertFailed', err instanceof Error ? err.message : String(err)) } });
+              this.post({ type: 'error', payload: { message: vscode.l10n.t('Revert succeeded, but the follow-up push failed: {0}', err instanceof Error ? err.message : String(err)) } });
             }
           }
           this.post({ type: 'operationComplete', payload: { operation: 'revert', success: true } });
           if (message.payload.pushAfter && !message.payload.noCommit && !revertPushFailed) {
-            vscode.window.showInformationMessage(vscode.l10n.t('revertedAndPushed', message.payload.commit.substring(0, 7)));
+            vscode.window.showInformationMessage(vscode.l10n.t('Reverted {0} and pushed', message.payload.commit.substring(0, 7)));
           } else {
-            vscode.window.showInformationMessage(vscode.l10n.t('reverted', message.payload.commit.substring(0, 7)));
+            vscode.window.showInformationMessage(vscode.l10n.t('Reverted {0}', message.payload.commit.substring(0, 7)));
           }
           await this.refreshAll();
           break;
@@ -1257,28 +1257,28 @@ export class MainPanel {
         case 'commitFixup': {
           await this.gitService.commitFixup(message.payload.commit);
           this.post({ type: 'operationComplete', payload: { operation: 'commitFixup', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('committedFixup', message.payload.commit.substring(0, 7)));
+          vscode.window.showInformationMessage(vscode.l10n.t('Committed fixup for {0}', message.payload.commit.substring(0, 7)));
           await this.refreshAll();
           break;
         }
         case 'commitSquash': {
           await this.gitService.commitSquash(message.payload.commit);
           this.post({ type: 'operationComplete', payload: { operation: 'commitSquash', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('committedSquash', message.payload.commit.substring(0, 7)));
+          vscode.window.showInformationMessage(vscode.l10n.t('Committed squash for {0}', message.payload.commit.substring(0, 7)));
           await this.refreshAll();
           break;
         }
         case 'createTag': {
           await this.gitService.createTag(message.payload.name, message.payload.ref, message.payload.message);
           this.post({ type: 'operationComplete', payload: { operation: 'createTag', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('tagCreated', message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Tag \'{0}\' created', message.payload.name));
           await this.refreshAll();
           break;
         }
         case 'deleteTag': {
           await this.gitService.deleteTag(message.payload.name);
           this.post({ type: 'operationComplete', payload: { operation: 'deleteTag', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('tagDeleted', message.payload.name));
+          vscode.window.showInformationMessage(vscode.l10n.t('Tag \'{0}\' deleted', message.payload.name));
           await this.refreshAll();
           break;
         }
@@ -1415,10 +1415,10 @@ export class MainPanel {
           const names = stashPaths.map(p => path.basename(p));
           let fileList = names.slice(0, MAX_LISTED).join(', ');
           if (names.length > MAX_LISTED) {
-            fileList += vscode.l10n.t('stashFilesRestoredMore', String(names.length - MAX_LISTED));
+            fileList += vscode.l10n.t(' +{0} more', String(names.length - MAX_LISTED));
           }
           vscode.window.showInformationMessage(
-            vscode.l10n.t('stashFilesRestored', String(stashPaths.length), `stash@{${index}}`, fileList),
+            vscode.l10n.t('Restored {0} file(s) from {1}: {2}', String(stashPaths.length), `stash@{${index}}`, fileList),
           );
           await this.refreshAll();
           break;
@@ -1427,7 +1427,7 @@ export class MainPanel {
           const { commit, file, hunkIndex, lineIndices } = message.payload;
           await this.gitService.reverseCommitChanges(commit, file, { hunkIndex, lineIndices });
           this.post({ type: 'operationComplete', payload: { operation: 'reverseCommitChanges', success: true } });
-          vscode.window.showInformationMessage(vscode.l10n.t('reversedFileChange', path.basename(file)));
+          vscode.window.showInformationMessage(vscode.l10n.t('Reversed changes to {0}', path.basename(file)));
           await this.refreshAll();
           break;
         }
