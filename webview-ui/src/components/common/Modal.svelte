@@ -139,7 +139,7 @@
   }
 
   .modal-body {
-    padding: 18px 20px;
+    padding: 20px;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
@@ -429,15 +429,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 16px;
-  }
-
-  :global(.modal-form-group + .form-actions) {
-    margin-top: 12px;
-  }
-
-  :global(.modal-warning + .form-actions) {
-    margin-top: 6px;
+    margin-top: 24px;
   }
 
   :global(.modal-form-group:last-of-type) {

@@ -807,13 +807,6 @@
     color: #b71c1c;
   }
 
-  .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
-  }
-
   .todo-content {
     display: flex;
     align-items: center;
