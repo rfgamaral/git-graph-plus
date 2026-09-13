@@ -78,6 +78,15 @@
 </Modal>
 
 <style>
+  .form-actions {
+    align-items: center;
+  }
+
+  .form-actions > button {
+    align-self: flex-end;
+    flex-shrink: 0;
+  }
+
   .conflict-status {
     display: flex;
     align-items: center;

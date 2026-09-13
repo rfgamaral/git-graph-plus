@@ -26,14 +26,14 @@ describe('ConflictFilesPopover', () => {
     expect(container.querySelector('.conflict-files-popover')).toBeNull();
   });
 
-  it('lists every conflicting file on hover', async () => {
-    const { container } = renderPopover({ files: ['src/a.ts', 'src/nested/b.ts'] });
+  it('preserves every full path in a long conflict list on hover', async () => {
+    const files = Array.from({ length: 30 }, (_, i) =>
+      `src/components/deeply/nested/directory/with/a/long/path/conflicting-file-${i}.ts`,
+    );
+    const { container, getAllByRole } = renderPopover({ files });
     await fireEvent.mouseEnter(container.querySelector('.conflict-files-trigger')!);
 
-    const items = container.querySelectorAll('.conflict-files-popover__item');
-    expect(items.length).toBe(2);
-    expect(items[0].textContent).toContain('src/a.ts');
-    expect(items[1].textContent).toContain('src/nested/b.ts');
+    expect(getAllByRole('listitem').map(item => item.textContent)).toEqual(files);
   });
 
   it('shows the title in the header without duplicating the count', async () => {
@@ -52,7 +52,7 @@ describe('ConflictFilesPopover', () => {
 
     const note = container.querySelector('.conflict-files-popover__truncated');
     expect(note).not.toBeNull();
-    expect(note!.textContent).toContain('checked first 20 commits only');
+    expect(note!.textContent).toBe('Checked the first 20 commits only');
   });
 
   it('omits the truncation note when not truncated', async () => {

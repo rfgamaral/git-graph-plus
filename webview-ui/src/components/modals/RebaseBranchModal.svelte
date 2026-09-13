@@ -67,20 +67,23 @@
     <p class="modal-warning" role="alert"><i class="codicon codicon-warning"></i><span>{@html t('rebase.pushAfterWarning')}</span></p>
   {/if}
   <div class="form-actions">
-    <div class="conflict-status" class:is-warning={conflictPrediction?.hasConflict} class:is-success={conflictPrediction !== null && !conflictPrediction?.hasConflict}>
-      {#if conflictPrediction === null}
-        <span class="spinner"></span>
-        <span>{t('rebase.checkingConflicts')}</span>
-      {:else if conflictPrediction.hasConflict}
-        <ConflictFilesPopover files={conflictPrediction.files} truncated={conflictPrediction.truncated}>
-          <i class="codicon codicon-warning"></i>
-          <span>{@html t('rebase.conflictWarning', { count: String(conflictPrediction.files.length) })}</span>
-        </ConflictFilesPopover>
-        {#if conflictPrediction.truncated}<span class="conflict-truncated">({t('rebase.predictionTruncated')})</span>{/if}
-      {:else}
-        <i class="codicon codicon-check modal-status-check"></i>
-        <span>{t('rebase.noConflict')}</span>
-        {#if conflictPrediction.truncated}<span class="conflict-truncated">({t('rebase.predictionTruncated')})</span>{/if}
+    <div class="conflict-summary">
+      <div class="conflict-status" class:is-warning={conflictPrediction?.hasConflict} class:is-success={conflictPrediction !== null && !conflictPrediction?.hasConflict}>
+        {#if conflictPrediction === null}
+          <span class="spinner"></span>
+          <span>{t('rebase.checkingConflicts')}</span>
+        {:else if conflictPrediction.hasConflict}
+          <ConflictFilesPopover files={conflictPrediction.files} truncated={conflictPrediction.truncated}>
+            <i class="codicon codicon-warning"></i>
+            <span>{@html t('rebase.conflictWarning', { count: String(conflictPrediction.files.length) })}</span>
+          </ConflictFilesPopover>
+        {:else}
+          <i class="codicon codicon-check modal-status-check"></i>
+          <span>{t('rebase.noConflict')}</span>
+        {/if}
+      </div>
+      {#if conflictPrediction?.truncated}
+        <p class="conflict-truncated">{t('rebase.predictionTruncated')}</p>
       {/if}
     </div>
     <button onclick={onClose}>{t('common.cancel')}</button>
@@ -89,18 +92,38 @@
 </Modal>
 
 <style>
+  .form-actions {
+    align-items: center;
+  }
+
+  .form-actions > button {
+    align-self: flex-end;
+    flex-shrink: 0;
+  }
+
+  .conflict-summary {
+    margin-right: auto;
+    min-width: 0;
+    min-height: 28px;
+    line-height: 16px;
+  }
+
   .conflict-status {
     display: flex;
     align-items: center;
     gap: 5px;
     font-size: inherit;
-    margin-right: auto;
     color: var(--text-secondary);
   }
 
   .conflict-status.is-warning { color: #f0a020; }
   .conflict-status.is-success { color: #4caf50; }
 
-  .conflict-truncated { color: var(--text-secondary); font-size: 0.9em; }
+  .conflict-truncated {
+    margin: 0 0 0 21px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    line-height: 12px;
+  }
 
 </style>

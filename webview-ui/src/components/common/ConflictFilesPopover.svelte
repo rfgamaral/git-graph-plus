@@ -112,8 +112,9 @@
     border: 1px solid var(--vscode-editorWidget-border, var(--border-color));
     border-radius: 6px;
     padding: 8px 10px;
-    min-width: 220px;
-    max-width: 420px;
+    width: max-content;
+    min-width: min(220px, calc(100vw - 8px));
+    max-width: min(800px, calc(100vw - 8px));
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
     font-size: calc(var(--vscode-font-size, 13px) - 1px);
     color: var(--text-primary);
@@ -138,8 +139,8 @@
   .conflict-files-popover__list {
     list-style: none;
     margin: 0;
-    padding: 0;
-    max-height: 200px;
+    padding: 0 8px 0 0;
+    max-height: min(320px, calc(100vh - 100px));
     overflow-y: auto;
   }
 
@@ -147,7 +148,9 @@
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 0.95em;
     line-height: 1.6;
-    word-break: break-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--text-secondary);
   }
 
