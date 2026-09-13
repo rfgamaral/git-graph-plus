@@ -1,5 +1,6 @@
 <script lang="ts">
   import Modal from '../common/Modal.svelte';
+  import UpdateRefsOption from '../common/UpdateRefsOption.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
   import { defaultsStore } from '../../lib/stores/defaults.svelte';
@@ -8,11 +9,13 @@
     upstream: string;
     currentBranch: string;
     onClose: () => void;
-    onPull: (options: { rebase: boolean; stash: boolean }) => void;
+    onPull: (options: { rebase: boolean; stash: boolean; updateRefs?: boolean }) => void;
   }
 
   let { upstream, currentBranch, onClose, onPull }: Props = $props();
   let rebase = $state(defaultsStore.current.pull.rebase);
+  let updateRefs = $state<boolean | undefined>();
+  let updateRefsReady = $state(false);
   let stash = $state(defaultsStore.current.pull.stash);
 </script>
 
@@ -30,6 +33,9 @@
       <span class="modal-flag-badge">--rebase</span>
     </label>
   </div>
+  <div hidden={!rebase}>
+    <UpdateRefsOption bind:value={updateRefs} bind:ready={updateRefsReady} />
+  </div>
   <div class="modal-form-group">
     <label class="modal-checkbox">
       <input type="checkbox" bind:checked={stash} />
@@ -39,6 +45,6 @@
   </div>
   <div class="form-actions">
     <button onclick={onClose}>{t('common.cancel')}</button>
-    <button class="primary" onclick={() => onPull({ rebase, stash })}>{t('pull.pull')}</button>
+    <button class="primary" disabled={rebase && !updateRefsReady} onclick={() => { if (!rebase || updateRefsReady) onPull({ rebase, stash, updateRefs: rebase ? updateRefs : undefined }); }}>{t('pull.pull')}</button>
   </div>
 </Modal>

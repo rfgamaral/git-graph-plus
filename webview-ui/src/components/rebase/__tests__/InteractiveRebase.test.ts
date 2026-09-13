@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import InteractiveRebase from '../InteractiveRebase.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import type { Commit } from '../../../lib/types';
@@ -22,6 +23,17 @@ function deliverCommits(commits: Commit[]) {
   window.dispatchEvent(new MessageEvent('message', {
     data: { type: 'rebaseCommitsData', payload: { commits } },
   }));
+}
+
+async function deliverRebaseSettings() {
+  await tick();
+  const requestId = (globalThis.__postedMessages.find(m =>
+    (m.data as { type: string }).type === 'getRebaseSettings',
+  )!.data as { payload: { requestId: string } }).payload.requestId;
+  window.dispatchEvent(new MessageEvent('message', {
+    data: { type: 'rebaseSettings', payload: { requestId, supported: true, updateRefs: false } },
+  }));
+  await tick();
 }
 
 const baseProps = {
@@ -204,6 +216,7 @@ describe('InteractiveRebase — submit', () => {
       commit({ hash: 'c2', subject: 'two' }),
     ]);
     await waitFor(() => container.querySelector('.todo-item'));
+    await deliverRebaseSettings();
     const start = container.querySelector<HTMLButtonElement>('button.primary')!;
     expect(start.disabled).toBe(true);
   });
@@ -220,14 +233,16 @@ describe('InteractiveRebase — submit', () => {
     await fireEvent.click(badges[1]);
     const opts = container.querySelectorAll<HTMLButtonElement>('.action-option');
     await fireEvent.click(Array.from(opts).find(o => o.textContent?.toLowerCase().includes('drop'))!);
+    await deliverRebaseSettings();
     globalThis.__postedMessages = [];
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
     const req = globalThis.__postedMessages.find(
       (m) => (m.data as { type?: string }).type === 'interactiveRebase'
     );
     expect(req).toBeDefined();
-    const payload = (req!.data as { payload: { base: string; todos: Array<{ action: string; hash: string }> } }).payload;
+    const payload = (req!.data as { payload: { base: string; todos: Array<{ action: string; hash: string }>; updateRefs?: boolean } }).payload;
     expect(payload.base).toBe('baseHash1234567');
+    expect(payload.updateRefs).toBe(false);
     expect(payload.todos.map(t => t.action)).toEqual(['pick', 'drop']);
     expect(payload.todos.map(t => t.hash)).toEqual(['c1', 'c2']);
     expect(onClose).toHaveBeenCalled();
@@ -260,6 +275,8 @@ describe('InteractiveRebase — reordering', () => {
     await waitFor(() => container.querySelectorAll('.todo-item').length === 2);
     const moveBtns = container.querySelectorAll<HTMLButtonElement>('.move-btn');
     await fireEvent.click(moveBtns[1]);
+    expect(container.querySelector<HTMLButtonElement>('button.primary')!.disabled).toBe(true);
+    await deliverRebaseSettings();
     await waitFor(() => {
       const start = container.querySelector<HTMLButtonElement>('button.primary')!;
       expect(start.disabled).toBe(false);
@@ -469,6 +486,9 @@ describe('InteractiveRebase — keyboard navigation', () => {
     // Make a change so the rebase is allowed to start.
     await fireEvent.keyDown(window, { key: 'ArrowDown' });
     await fireEvent.keyDown(window, { key: 'd' });
+    await fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    expect(onClose).not.toHaveBeenCalled();
+    await deliverRebaseSettings();
     globalThis.__postedMessages = [];
     await fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
     await waitFor(() => {
@@ -487,6 +507,7 @@ describe('InteractiveRebase — keyboard navigation', () => {
       commit({ hash: 'c2', subject: 'two' }),
     ]);
     await waitFor(() => container.querySelector('.todo-item'));
+    await deliverRebaseSettings();
     globalThis.__postedMessages = [];
     await fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
     const req = globalThis.__postedMessages.find(

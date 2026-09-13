@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import PullModal from '../PullModal.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import { defaultsStore } from '../../../lib/stores/defaults.svelte';
@@ -16,6 +17,16 @@ beforeEach(() => {
   i18n.setLocale('en');
 });
 
+async function deliverRebaseSettings() {
+  const requestId = (globalThis.__postedMessages.find(m =>
+    (m.data as { type: string }).type === 'getRebaseSettings',
+  )!.data as { payload: { requestId: string } }).payload.requestId;
+  window.dispatchEvent(new MessageEvent('message', {
+    data: { type: 'rebaseSettings', payload: { requestId, supported: true, updateRefs: false } },
+  }));
+  await tick();
+}
+
 function findFlagBox(container: HTMLElement, flag: string): HTMLInputElement {
   const labels = container.querySelectorAll('label.modal-checkbox');
   for (const lbl of labels) {
@@ -30,8 +41,9 @@ describe('PullModal — payload composition', () => {
   it('defaults to rebase=true, stash=false', async () => {
     const onPull = vi.fn();
     const { container } = render(PullModal, { ...baseProps, onPull });
+    await deliverRebaseSettings();
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
-    expect(onPull).toHaveBeenCalledWith({ rebase: true, stash: false });
+    expect(onPull).toHaveBeenCalledWith({ rebase: true, stash: false, updateRefs: false });
   });
 
   it('toggling --rebase off flips the payload', async () => {
@@ -39,12 +51,13 @@ describe('PullModal — payload composition', () => {
     const { container } = render(PullModal, { ...baseProps, onPull });
     await fireEvent.click(findFlagBox(container, '--rebase'));
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
-    expect(onPull.mock.calls[0][0].rebase).toBe(false);
+    expect(onPull).toHaveBeenCalledWith({ rebase: false, stash: false, updateRefs: undefined });
   });
 
   it('toggling --autostash on flips the payload', async () => {
     const onPull = vi.fn();
     const { container } = render(PullModal, { ...baseProps, onPull });
+    await deliverRebaseSettings();
     await fireEvent.click(findFlagBox(container, '--autostash'));
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
     expect(onPull.mock.calls[0][0].stash).toBe(true);

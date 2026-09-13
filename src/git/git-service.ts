@@ -1429,8 +1429,10 @@ export class GitService {
     return this.execWithAuthRetry(args, remote);
   }
 
-  async pull(remote?: string, branch?: string, options?: { rebase?: boolean }): Promise<string> {
-    const args = ['pull'];
+  async pull(remote?: string, branch?: string, options?: { rebase?: boolean; updateRefs?: boolean }): Promise<string> {
+    const args = options?.rebase && options.updateRefs !== undefined
+      ? ['-c', `rebase.updateRefs=${options.updateRefs}`, 'pull']
+      : ['pull'];
     if (options?.rebase) {
       args.push('--rebase');
     }
@@ -1580,9 +1582,24 @@ export class GitService {
     }
   }
 
-  async rebase(onto: string, options?: { autostash?: boolean }): Promise<void> {
+  async getRebaseSettings(): Promise<{ updateRefs: boolean; supported: boolean }> {
+    const version = (await this.exec(['--version'])).match(/git version (\d+)\.(\d+)/);
+    const supported = version !== null && (Number(version[1]) > 2 || (Number(version[1]) === 2 && Number(version[2]) >= 38));
+    let updateRefs = false;
+    try {
+      updateRefs = (await this.exec(['config', '--type=bool', '--get', 'rebase.updateRefs'], { silent: true })).trim() === 'true';
+    } catch (err) {
+      if (!(err instanceof GitError) || err.exitCode !== 1) { throw err; }
+    }
+    return { updateRefs, supported };
+  }
+
+  async rebase(onto: string, options?: { autostash?: boolean; updateRefs?: boolean }): Promise<void> {
     this.assertSafeRef(onto, 'rebase');
     const args = ['rebase'];
+    if (options?.updateRefs !== undefined) {
+      args.push(options.updateRefs ? '--update-refs' : '--no-update-refs');
+    }
     if (options?.autostash) {
       args.push('--autostash');
     }
@@ -1618,7 +1635,8 @@ export class GitService {
    */
   async interactiveRebase(
     base: string,
-    todos: Array<{ action: string; hash: string; subject: string; message?: string }>
+    todos: Array<{ action: string; hash: string; subject: string; message?: string }>,
+    options?: { updateRefs?: boolean }
   ): Promise<void> {
     this.assertSafeRef(base, 'rebase -i');
     // Validate inputs to prevent injection
@@ -1640,8 +1658,22 @@ export class GitService {
       );
     }
 
-    const isSquashLike = (a: string) => a === 'squash' || a === 'fixup';
+    let updateRefs = options?.updateRefs;
+    if (updateRefs === undefined) {
+      const settings = await this.getRebaseSettings();
+      updateRefs = settings.supported && settings.updateRefs;
+    }
+    const branchRefs = updateRefs
+      ? (await this.exec(['for-each-ref', '--format=%(if)%(worktreepath)%(then)%(else)%(objectname)%09%(refname)%(end)', 'refs/heads/']))
+        .trim().split('\n').filter(Boolean).map(line => line.split('\t'))
+      : [];
     const lines: string[] = [];
+    const appendUpdateRefs = (entries: typeof todos) => {
+      for (const [hash, ref] of branchRefs) {
+        if (entries.some(entry => hash.startsWith(entry.hash))) { lines.push(`update-ref ${ref}`); }
+      }
+    };
+    const isSquashLike = (a: string) => a === 'squash' || a === 'fixup';
     let i = 0;
 
     while (i < todos.length) {
@@ -1650,12 +1682,16 @@ export class GitService {
       // Squash group: a non-squash target followed by one or more squash/fixup members.
       // Checked before the standalone reword path so that "reword + squash" honors the
       // user's typed final message instead of letting git's default-editor combine messages.
+      let next = i + 1;
+      while (todo.action !== 'drop' && todos[next]?.action === 'drop') { next++; }
       const isGroupTarget =
+        todo.action !== 'drop' &&
         !isSquashLike(todo.action) &&
-        i + 1 < todos.length &&
-        isSquashLike(todos[i + 1].action);
+        next < todos.length &&
+        isSquashLike(todos[next].action);
 
       if (isGroupTarget) {
+        const groupStart = i;
         // reword as a group target is equivalent to pick + amend, which we already do via exec below.
         const targetAction = todo.action === 'reword' ? 'pick' : todo.action;
         lines.push(`${targetAction} ${todo.hash}`);
@@ -1664,7 +1700,7 @@ export class GitService {
         const messageChanged = finalMessage !== todo.subject.trim();
         const userWantsReword = todo.action === 'reword';
         i++;
-        while (i < todos.length && isSquashLike(todos[i].action)) {
+        while (i < todos.length && (isSquashLike(todos[i].action) || todos[i].action === 'drop')) {
           lines.push(`${todos[i].action} ${todos[i].hash}`);
           i++;
         }
@@ -1674,6 +1710,7 @@ export class GitService {
         if (finalMessage && (messageChanged || userWantsReword)) {
           lines.push(`exec ${this.buildAmendCommand(finalMessage)}`);
         }
+        appendUpdateRefs(todos.slice(groupStart, i));
         continue;
       }
 
@@ -1684,13 +1721,16 @@ export class GitService {
         if (msg) {
           lines.push(`exec ${this.buildAmendCommand(msg)}`);
         }
+        appendUpdateRefs([todo]);
         i++;
         continue;
       }
       lines.push(`${todo.action} ${todo.hash}`);
+      appendUpdateRefs([todo]);
       i++;
     }
 
+    const args = ['rebase', '-i', ...(options?.updateRefs === undefined ? [] : [updateRefs ? '--update-refs' : '--no-update-refs']), base];
     const todoContent = lines.join('\n') + '\n';
     const todoFile = join(this.gitDir(), `ghg-rebase-todo-${randomUUID()}`);
 
@@ -1702,10 +1742,11 @@ export class GitService {
       // that cmd.exe / sh expansion handles repo paths containing &, |, (, ),
       // ^, etc. safely without manual escaping.
       await new Promise<void>((resolve, reject) => {
-        const proc = spawn(getGitBinaryPath(), ['rebase', '-i', base], {
+        const proc = spawn(getGitBinaryPath(), args, {
           cwd: this.repoPath,
           env: {
             ...process.env,
+            ...this.extraEnv,
             GIT_TERMINAL_PROMPT: '0',
             LC_ALL: 'C',
             GIT_MERGE_AUTOEDIT: 'no',
@@ -1730,10 +1771,10 @@ export class GitService {
             existsSync(join(gitDir, 'rebase-merge')) ||
             existsSync(join(gitDir, 'rebase-apply'));
           if (paused) { resolve(); return; }
-          reject(new GitError(stderr, code, ['rebase', '-i', base]));
+          reject(new GitError(stderr, code, args));
         });
         proc.on('error', (err) => {
-          reject(new GitError(err.message, null, ['rebase', '-i', base]));
+          reject(new GitError(err.message, null, args));
         });
       });
     } finally {

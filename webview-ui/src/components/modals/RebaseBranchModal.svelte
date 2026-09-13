@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Modal from '../common/Modal.svelte';
+  import UpdateRefsOption from '../common/UpdateRefsOption.svelte';
   import ConflictFilesPopover from '../common/ConflictFilesPopover.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
@@ -12,10 +13,12 @@
     branch: string;
     onto: string;
     onClose: () => void;
-    onRebase: (options: { autostash: boolean; pushAfter: boolean }) => void;
+    onRebase: (options: { autostash: boolean; pushAfter: boolean; updateRefs?: boolean }) => void;
   }
 
   let { branch, onto, onClose, onRebase }: Props = $props();
+  let updateRefs = $state<boolean | undefined>();
+  let updateRefsReady = $state(false);
   let autostash = $state(defaultsStore.current.rebase.autostash);
   let pushAfter = $state(defaultsStore.current.rebase.pushAfter);
   let rebaseBtn: HTMLButtonElement | undefined = $state();
@@ -52,6 +55,7 @@
       <span class="modal-flag-badge">--autostash</span>
     </label>
   </div>
+  <UpdateRefsOption bind:value={updateRefs} bind:ready={updateRefsReady} />
   <div class="modal-form-group">
     <label class="modal-checkbox">
       <input type="checkbox" bind:checked={pushAfter} />
@@ -80,7 +84,7 @@
       {/if}
     </div>
     <button onclick={onClose}>{t('common.cancel')}</button>
-    <button class="primary" bind:this={rebaseBtn} onclick={() => onRebase({ autostash, pushAfter })}>{t('rebaseBranch.rebase')}</button>
+    <button class="primary" bind:this={rebaseBtn} disabled={!updateRefsReady} onclick={() => { if (updateRefsReady) onRebase({ autostash, pushAfter, updateRefs }); }}>{t('rebaseBranch.rebase')}</button>
   </div>
 </Modal>
 

@@ -458,6 +458,12 @@ export const en: Record<string, string> = {
   'rebaseBranch.desc': 'Rebase the current branch onto the selected branch. This will rewrite commit history.',
   'rebaseBranch.rebase': 'Rebase',
   'rebase.autostash': 'Stash and reapply local changes (tracked only)',
+  'rebase.updateRefs': 'Update dependent branches',
+  'rebase.updateRefsDescription': 'Automatically force-update branches that point to commits being rebased.',
+  'rebase.updateRefsTooltip': 'Does not update remote branches or branches checked out in any worktree.',
+  'rebase.updateRefsLoading': 'Loading Git rebase settings…',
+  'rebase.updateRefsUnsupported': 'Requires Git 2.38 or newer.',
+  'rebase.updateRefsError': 'Could not load Git rebase settings: {error}',
   'rebase.pushAfter': 'Push the branch after a successful rebase',
   'rebase.pushAfterWarning': 'Force-pushes and <span class="modal-emph modal-emph--danger">overwrites the remote branch</span>. --force-with-lease aborts if the remote has commits you haven\'t fetched, but coordinate with anyone sharing this branch.',
 

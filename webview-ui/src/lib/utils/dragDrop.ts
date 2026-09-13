@@ -20,8 +20,8 @@ export function resolveDrop(
   return { kind: 'menu', source, target };
 }
 
-export function dragRebaseMessage(source: string, target: string, dirty: DirtyPayload = {}) {
-  return { type: 'dragRebase' as const, payload: { source, target, ...dirty } };
+export function dragRebaseMessage(source: string, target: string, dirty: DirtyPayload = {}, updateRefs?: boolean) {
+  return { type: 'dragRebase' as const, payload: { source, target, ...dirty, updateRefs } };
 }
 
 export function dragMergeMessage(source: string, target: string, dirty: DirtyPayload = {}) {

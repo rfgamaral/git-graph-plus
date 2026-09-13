@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack, onMount } from 'svelte';
   import Modal from '../common/Modal.svelte';
+  import UpdateRefsOption from '../common/UpdateRefsOption.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
   import { getVsCodeApi } from '../../lib/vscode-api';
@@ -30,7 +31,9 @@
   // `pick`. Fetched on mount so it is ready by the time the user confirms.
   let rebaseCommits = $state<Commit[] | null>(null);
 
-  const canSquash = $derived(rebaseCommits !== null && editedMessage.trim().length > 0);
+  let updateRefs = $state<boolean | undefined>();
+  let updateRefsReady = $state(false);
+  const canSquash = $derived(updateRefsReady && rebaseCommits !== null && editedMessage.trim().length > 0);
 
   onMount(() => {
     function handleMessage(event: MessageEvent) {
@@ -48,7 +51,7 @@
     if (!canSquash || !rebaseCommits) return;
     const selectedHashes = chain.map(c => c.hash);
     const todos = buildSquashTodos(rebaseCommits, selectedHashes, chain[0].hash, editedMessage);
-    vscode.postMessage({ type: 'interactiveRebase', payload: { base, todos, squashCount: chain.length } });
+    vscode.postMessage({ type: 'interactiveRebase', payload: { base, todos, squashCount: chain.length, updateRefs } });
     onClose();
   }
 </script>
@@ -77,6 +80,8 @@
       bind:value={editedMessage}
     ></textarea>
   </div>
+
+  <UpdateRefsOption bind:value={updateRefs} bind:ready={updateRefsReady} />
 
   {#if hasPushedCommits}
     <p class="modal-warning" role="alert">

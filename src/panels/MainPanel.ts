@@ -949,7 +949,7 @@ export class MainPanel {
             await this.gitService.stashSave('Auto-stash before pull');
           }
           try {
-            await this.gitService.pull(message.payload.remote, message.payload.branch, { rebase: message.payload.rebase });
+            await this.gitService.pull(message.payload.remote, message.payload.branch, { rebase: message.payload.rebase, updateRefs: message.payload.updateRefs });
           } finally {
             if (message.payload.stash) {
               try {
@@ -998,7 +998,7 @@ export class MainPanel {
           break;
         }
         case 'rebase': {
-          await this.gitService.rebase(message.payload.onto, { autostash: message.payload.autostash });
+          await this.gitService.rebase(message.payload.onto, { autostash: message.payload.autostash, updateRefs: message.payload.updateRefs });
           // Optional follow-up: push the rebased branch. Rebase rewrites history,
           // so this force-pushes with --force-with-lease. A push failure here is
           // non-fatal — the rebase already succeeded — so surface it separately.
@@ -1041,7 +1041,7 @@ export class MainPanel {
           if (dragCurrent !== message.payload.source) {
             await this.gitService.checkout(message.payload.source, { force: message.payload.force, merge: message.payload.merge });
           }
-          await this.gitService.rebase(message.payload.target);
+          await this.gitService.rebase(message.payload.target, { updateRefs: message.payload.updateRefs });
           this.post({ type: 'operationComplete', payload: { operation: 'rebase', success: true } });
           vscode.window.showInformationMessage(
             vscode.l10n.t('Rebased {0} onto {1}', message.payload.source, message.payload.target),
@@ -1095,7 +1095,7 @@ export class MainPanel {
           break;
         }
         case 'interactiveRebase': {
-          await this.gitService.interactiveRebase(message.payload.base, message.payload.todos);
+          await this.gitService.interactiveRebase(message.payload.base, message.payload.todos, { updateRefs: message.payload.updateRefs });
           this.post({ type: 'operationComplete', payload: { operation: 'interactiveRebase', success: true } });
           // A squash routes through this same backend; surface a dedicated
           // confirmation, otherwise a generic one so the rebase never completes
@@ -1117,6 +1117,15 @@ export class MainPanel {
             ?? vscode.window.createTerminal({ name, cwd: this.repoPath });
           terminal.show();
           terminal.sendText(command, true);
+          break;
+        }
+        case 'getRebaseSettings': {
+          try {
+            const settings = await this.gitService.getRebaseSettings();
+            this.post({ type: 'rebaseSettings', payload: { ...settings, requestId: message.payload.requestId } });
+          } catch (err) {
+            this.post({ type: 'rebaseSettings', payload: { requestId: message.payload.requestId, updateRefs: false, supported: false, error: err instanceof Error ? err.message : String(err) } });
+          }
           break;
         }
         case 'getRebaseCommits': {

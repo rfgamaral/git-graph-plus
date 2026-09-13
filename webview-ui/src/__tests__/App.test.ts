@@ -827,7 +827,14 @@ describe('App — modal callback payloads', () => {
     branchStore.remotes = [{ name: 'origin', fetchUrl: '', pushUrl: '' }];
     render(App);
     modalStore.openPull();
-    await waitFor(() => expect(document.querySelector('button.primary')).not.toBeNull());
+    await waitFor(() => expect(globalThis.__postedMessages.some(
+      m => (m.data as { type: string }).type === 'getRebaseSettings',
+    )).toBe(true));
+    const request = globalThis.__postedMessages.find(
+      m => (m.data as { type: string }).type === 'getRebaseSettings',
+    )!.data as { payload: { requestId: string } };
+    postMsg('rebaseSettings', { requestId: request.payload.requestId, supported: true, updateRefs: false });
+    await waitFor(() => expect(document.querySelector<HTMLButtonElement>('button.primary')?.disabled).toBe(false));
     globalThis.__postedMessages = [];
     await fireEvent.click(document.querySelector<HTMLButtonElement>('button.primary')!);
     expect(globalThis.__postedMessages.some(

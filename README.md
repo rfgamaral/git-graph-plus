@@ -71,6 +71,10 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 | **Tags**                 | Create lightweight or annotated tags; view tag details, push to remote, delete locally or from remote |
 | **Upstream Tracking**    | Automatic local/remote branch matching based on upstream configuration                                |
 
+When rebasing, enable **Update dependent branches** to move other local branches pointing to
+rewritten commits. The checkbox defaults to Git’s `rebase.updateRefs` setting; changes apply only
+to that operation. Requires Git 2.38 or later.
+
 ### Remote Operations
 
 | Feature                 | Description                                                                    |

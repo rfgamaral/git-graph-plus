@@ -4,6 +4,7 @@
   import { t } from '../../lib/i18n/index.svelte';
   import type { Commit } from '../../lib/types';
   import Modal from '../common/Modal.svelte';
+  import UpdateRefsOption from '../common/UpdateRefsOption.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
   import { applyAutosquash, hasAutosquashTargets } from '../../lib/autosquash';
 
@@ -29,6 +30,8 @@
   let todos = $state<TodoEntry[]>([]);
   let initialOrder = $state<string[]>([]);
   let loading = $state(true);
+  let updateRefs = $state<boolean | undefined>();
+  let updateRefsReady = $state(false);
   let dragIndex = $state<number | null>(null);
   // Row targeted by keyboard shortcuts. Highlighted via the `selected` class.
   let selectedIndex = $state(0);
@@ -252,6 +255,7 @@
   }
 
   function execute() {
+    if (!updateRefsReady || loading || !hasChanges) return;
     const allTodos = todos.map(t => ({
       action: t.action,
       hash: t.hash,
@@ -260,7 +264,7 @@
     }));
     vscode.postMessage({
       type: 'interactiveRebase',
-      payload: { base, todos: allTodos },
+      payload: { base, todos: allTodos, updateRefs },
     });
     onClose();
   }
@@ -338,13 +342,6 @@
       <i class="codicon codicon-git-commit"></i>
       <span use:tooltip={base} class="modal-pill modal-pill--source"><span class="modal-pill-text">{base.substring(0, 7)}</span></span>
     </div>
-    <div class="rebase-header">
-      <span class="rebase-count">{todos.length} commit{todos.length > 1 ? 's' : ''}</span>
-      <span class="rebase-hint">{t('rebase.instructions')}</span>
-      <span class="rebase-kbd-hint" use:tooltip={t('rebase.keyboardHint')}>
-        <i class="codicon codicon-keyboard"></i>
-      </span>
-    </div>
 
     {#if canAutosquash}
       <label class="autosquash-row">
@@ -363,6 +360,16 @@
         </span>
       </label>
     {/if}
+
+    <UpdateRefsOption bind:value={updateRefs} bind:ready={updateRefsReady} />
+
+    <div class="rebase-header">
+      <span class="rebase-count">{todos.length} commit{todos.length > 1 ? 's' : ''}</span>
+      <span class="rebase-hint">{t('rebase.instructions')}</span>
+      <span class="rebase-kbd-hint" use:tooltip={t('rebase.keyboardHint')}>
+        <i class="codicon codicon-keyboard"></i>
+      </span>
+    </div>
 
     <div class="todo-list" class:drag-active={dragIndex !== null} role="list">
       {#each todos as todo, index (todo.hash)}
@@ -471,7 +478,7 @@
       <button onclick={onClose}>{t('common.cancel')}</button>
       <button
         class="primary"
-        disabled={!hasChanges}
+        disabled={!hasChanges || !updateRefsReady}
         use:tooltip={hasChanges ? '' : t('rebase.noChanges')}
         onclick={execute}
       >{t('rebase.start')}</button>
@@ -488,6 +495,9 @@
   }
 
   .rebase-header {
+    border-top: 1px solid var(--border-color);
+    margin-top: 18px;
+    padding-top: 16px;
     display: flex;
     align-items: center;
     gap: 8px;

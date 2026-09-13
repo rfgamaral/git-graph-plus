@@ -29,6 +29,16 @@ function deliverRebaseCommits(base = 'r') {
   }));
 }
 
+async function deliverRebaseSettings() {
+  const requestId = (globalThis.__postedMessages.find(m =>
+    (m.data as { type: string }).type === 'getRebaseSettings',
+  )!.data as { payload: { requestId: string } }).payload.requestId;
+  window.dispatchEvent(new MessageEvent('message', {
+    data: { type: 'rebaseSettings', payload: { requestId, supported: true, updateRefs: false } },
+  }));
+  await tick();
+}
+
 describe('SquashModal', () => {
   it('pre-fills the message with the combined commit messages oldest→newest', () => {
     const { container } = render(SquashModal, {
@@ -54,7 +64,7 @@ describe('SquashModal', () => {
     expect(container.querySelector('.modal-warning')).not.toBeNull();
   });
 
-  it('keeps the squash button disabled until the rebase range arrives', async () => {
+  it('keeps the squash button disabled until the rebase range and settings arrive', async () => {
     const { container } = render(SquashModal, {
       chain, base: 'r', hasPushedCommits: false, onClose: vi.fn(),
     });
@@ -62,6 +72,8 @@ describe('SquashModal', () => {
     expect(btn.disabled).toBe(true);
     deliverRebaseCommits();
     await tick();
+    expect(btn.disabled).toBe(true);
+    await deliverRebaseSettings();
     expect(btn.disabled).toBe(false);
   });
 
@@ -71,7 +83,7 @@ describe('SquashModal', () => {
       chain, base: 'r', hasPushedCommits: false, onClose,
     });
     deliverRebaseCommits();
-    await tick();
+    await deliverRebaseSettings();
 
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
 
@@ -79,6 +91,7 @@ describe('SquashModal', () => {
     const rebase = posted.find(p => p.type === 'interactiveRebase');
     expect(rebase).toBeDefined();
     expect(rebase!.payload.base).toBe('r');
+    expect(rebase!.payload.updateRefs).toBe(false);
     expect(rebase!.payload.todos).toEqual([
       { action: 'pick', hash: 'a', subject: 'first', message: 'first\n\nsecond' },
       { action: 'fixup', hash: 'b', subject: 'second' },
@@ -91,7 +104,7 @@ describe('SquashModal', () => {
       chain, base: 'r', hasPushedCommits: false, onClose: vi.fn(),
     });
     deliverRebaseCommits();
-    await tick();
+    await deliverRebaseSettings();
 
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
 

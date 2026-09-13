@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/svelte';
+import { render, fireEvent, cleanup } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import RebaseBranchModal from '../RebaseBranchModal.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
@@ -7,7 +7,17 @@ import { defaultsStore } from '../../../lib/stores/defaults.svelte';
 import { DEFAULT_MODAL_DEFAULTS } from '../../../lib/defaults-shape';
 
 beforeEach(() => { i18n.setLocale('en'); });
-afterEach(() => { defaultsStore.current = structuredClone(DEFAULT_MODAL_DEFAULTS); });
+afterEach(() => { cleanup(); defaultsStore.current = structuredClone(DEFAULT_MODAL_DEFAULTS); });
+
+async function deliverRebaseSettings(updateRefs = false) {
+  const requestId = (globalThis.__postedMessages.find(m =>
+    (m.data as { type: string }).type === 'getRebaseSettings',
+  )!.data as { payload: { requestId: string } }).payload.requestId;
+  window.dispatchEvent(new MessageEvent('message', {
+    data: { type: 'rebaseSettings', payload: { requestId, supported: true, updateRefs } },
+  }));
+  await tick();
+}
 
 describe('RebaseBranchModal', () => {
   it('on mount, posts predictConflicts with mode=rebase and ours=branch, theirs=onto', () => {
@@ -50,36 +60,40 @@ describe('RebaseBranchModal', () => {
 
   it('forwards autostash flag to onRebase', async () => {
     const onRebase = vi.fn();
-    const { container } = render(RebaseBranchModal, {
+    const { container, getByLabelText } = render(RebaseBranchModal, {
       branch: 'topic', onto: 'main',
       onClose: vi.fn(), onRebase,
     });
-    const autostash = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[0]!;
+    await deliverRebaseSettings();
+    const autostash = getByLabelText(/Stash and reapply local changes/);
     await fireEvent.click(autostash);
+    await fireEvent.click(getByLabelText(/Update dependent branches/));
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
-    expect(onRebase).toHaveBeenCalledWith({ autostash: true, pushAfter: false });
+    expect(onRebase).toHaveBeenCalledWith({ autostash: true, pushAfter: false, updateRefs: true });
   });
 
   it('forwards pushAfter flag to onRebase', async () => {
     const onRebase = vi.fn();
-    const { container } = render(RebaseBranchModal, {
+    const { container, getByLabelText } = render(RebaseBranchModal, {
       branch: 'topic', onto: 'main',
       onClose: vi.fn(), onRebase,
     });
-    const pushAfter = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]!;
+    await deliverRebaseSettings();
+    const pushAfter = getByLabelText(/Push the branch after a successful rebase/);
     await fireEvent.click(pushAfter);
     await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
-    expect(onRebase).toHaveBeenCalledWith({ autostash: false, pushAfter: true });
+    expect(onRebase).toHaveBeenCalledWith({ autostash: false, pushAfter: true, updateRefs: false });
   });
 
   it('initializes autostash and pushAfter from defaultsStore', async () => {
     defaultsStore.current.rebase = { autostash: true, pushAfter: true };
-    const { container } = render(RebaseBranchModal, {
+    const { getByLabelText } = render(RebaseBranchModal, {
       branch: 'topic', onto: 'main',
       onClose: vi.fn(), onRebase: vi.fn(),
     });
-    const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    expect(checkboxes[0]!.checked).toBe(true);  // autostash
-    expect(checkboxes[1]!.checked).toBe(true);  // pushAfter
+    await deliverRebaseSettings(true);
+    expect((getByLabelText(/Update dependent branches/) as HTMLInputElement).checked).toBe(true);
+    expect((getByLabelText(/Stash and reapply local changes/) as HTMLInputElement).checked).toBe(true);  // autostash
+    expect((getByLabelText(/Push the branch after a successful rebase/) as HTMLInputElement).checked).toBe(true);  // pushAfter
   });
 });

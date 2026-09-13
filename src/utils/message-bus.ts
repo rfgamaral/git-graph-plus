@@ -57,16 +57,17 @@ export type WebviewMessage =
   | { type: 'merge'; payload: { branch: string; noFf?: boolean; ffOnly?: boolean; squash?: boolean; pushAfter?: boolean; deleteSource?: boolean } }
   | { type: 'fastForward'; payload: { local: string; remote: string; stash?: boolean; stashUntracked?: boolean; clean?: boolean; noCheckout?: boolean } }
   | { type: 'abortMerge' }
-  | { type: 'rebase'; payload: { onto: string; autostash?: boolean; pushAfter?: boolean } }
+  | { type: 'rebase'; payload: { onto: string; updateRefs?: boolean; autostash?: boolean; pushAfter?: boolean } }
   | { type: 'abortRebase' }
   | { type: 'continueRebase' }
   | { type: 'skipRebase' }
-  | { type: 'interactiveRebase'; payload: { base: string; todos: Array<{ action: string; hash: string; subject: string; message?: string }>; squashCount?: number } }
+  | { type: 'interactiveRebase'; payload: { base: string; todos: Array<{ action: string; hash: string; subject: string; message?: string }>; squashCount?: number; updateRefs?: boolean } }
   | { type: 'runClassicRebase'; payload: { base: string } }
+  | { type: 'getRebaseSettings'; payload: { requestId: string } }
   | { type: 'getRebaseCommits'; payload: { base: string } }
   | { type: 'reset'; payload: { ref: string; mode: 'soft' | 'mixed' | 'hard' } }
   | { type: 'push'; payload: { remote?: string; branch?: string; remoteBranch?: string; force?: 'with-lease' | 'force'; setUpstream?: boolean } }
-  | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean; stash?: boolean } }
+  | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean; updateRefs?: boolean; stash?: boolean } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean } }
   | { type: 'stashSave'; payload: { message?: string; includeUntracked?: boolean; keepIndex?: boolean } }
   | { type: 'stashApply'; payload: { index: number; drop?: boolean } }
@@ -75,7 +76,7 @@ export type WebviewMessage =
   | { type: 'commitFixup'; payload: { commit: string } }
   | { type: 'commitSquash'; payload: { commit: string } }
   | { type: 'reverseCommitChanges'; payload: { commit: string; file: string; hunkIndex?: number; lineIndices?: number[] } }
-  | { type: 'dragRebase'; payload: { source: string; target: string; force?: boolean; merge?: boolean; stash?: boolean; stashUntracked?: boolean; clean?: boolean } }
+  | { type: 'dragRebase'; payload: { source: string; target: string; updateRefs?: boolean; force?: boolean; merge?: boolean; stash?: boolean; stashUntracked?: boolean; clean?: boolean } }
   | { type: 'dragMerge'; payload: { source: string; target: string; force?: boolean; merge?: boolean; stash?: boolean; stashUntracked?: boolean; clean?: boolean } }
   | { type: 'addRemote'; payload: { name: string; url: string } }
   | { type: 'removeRemote'; payload: { name: string } }
@@ -156,6 +157,7 @@ export type ExtensionMessage =
   | { type: 'fullRefresh'; payload: { logData: CommitGraphData; branchData: BranchData } }
   | { type: 'commitDiffData'; payload: { hash?: string; diffs?: DiffData[]; files: Array<{ path: string; status: string }> } }
   | { type: 'commitSignatureData'; payload: { hash: string; signature: CommitSignature } }
+  | { type: 'rebaseSettings'; payload: { requestId: string; updateRefs: boolean; supported: boolean; error?: string } }
   | { type: 'rebaseCommitsData'; payload: { base: string; commits: Commit[] } }
   | { type: 'searchResults'; payload: CommitGraphData }
   | { type: 'activityLogData'; payload: Array<{ command: string; timestamp: string; success: boolean; duration: number }> }

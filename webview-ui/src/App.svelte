@@ -899,11 +899,12 @@ import AmendModal from './components/modals/AmendModal.svelte';
   <DirtyActionModal
     title={t('dirtyAction.title')}
     confirmLabel={t('dirtyAction.continue')}
-    onConfirm={(dirty) => {
+    rebase={modalStore.dragAction.op === 'rebase'}
+    onConfirm={(dirty, updateRefs) => {
       const d = modalStore.dragAction!;
       modalStore.closeDragAction();
       vscode.postMessage(d.op === 'rebase'
-        ? dragRebaseMessage(d.source, d.target, dirty)
+        ? dragRebaseMessage(d.source, d.target, dirty, updateRefs)
         : dragMergeMessage(d.source, d.target, dirty));
     }}
     onClose={() => { modalStore.closeDragAction(); }}
@@ -973,10 +974,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
     upstream={branchStore.currentBranch?.upstream ?? 'origin'}
     currentBranch={branchStore.currentBranch?.name ?? 'current branch'}
     onClose={() => { modalStore.closePull(); }}
-    onPull={({ rebase, stash }) => {
+    onPull={({ rebase, stash, updateRefs }) => {
       modalStore.closePull();
       uiStore.operating = 'pull';
-      vscode.postMessage({ type: 'pull', payload: { rebase, stash } });
+      vscode.postMessage({ type: 'pull', payload: { rebase, stash, updateRefs } });
     }}
   />
 {/if}
