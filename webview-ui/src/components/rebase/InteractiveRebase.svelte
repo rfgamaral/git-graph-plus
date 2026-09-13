@@ -40,8 +40,8 @@
 
   const ACTIONS: Array<{ value: TodoEntry['action']; icon: string; label: string; color: string }> = [
     { value: 'pick', icon: 'check', label: 'Pick', color: '#4caf50' },
-    { value: 'reword', icon: 'edit', label: 'Reword', color: '#2196f3' },
     { value: 'edit', icon: 'debug-pause', label: 'Edit', color: '#9c27b0' },
+    { value: 'reword', icon: 'edit', label: 'Reword', color: '#2196f3' },
     { value: 'squash', icon: 'fold', label: 'Squash', color: '#ff9800' },
     { value: 'fixup', icon: 'fold-down', label: 'Fixup', color: '#ff9800' },
     { value: 'drop', icon: 'trash', label: 'Drop', color: '#f44336' },
@@ -80,13 +80,23 @@
   function autoresize(node: HTMLTextAreaElement) {
     function resize() {
       node.style.height = 'auto';
-      node.style.height = node.scrollHeight + 'px';
+      if (document.activeElement === node) {
+        node.style.height = node.scrollHeight + 2 + 'px';
+      } else {
+        node.scrollTop = 0;
+      }
     }
     // Defer initial resize until after value binding is applied
     tick().then(resize);
     node.addEventListener('input', resize);
+    node.addEventListener('focus', resize);
+    node.addEventListener('blur', resize);
     return {
-      destroy() { node.removeEventListener('input', resize); },
+      destroy() {
+        node.removeEventListener('input', resize);
+        node.removeEventListener('focus', resize);
+        node.removeEventListener('blur', resize);
+      },
       update() { tick().then(resize); },
     };
   }
@@ -190,15 +200,25 @@
     window.addEventListener('message', handleMessage);
     vscode.postMessage({ type: 'getRebaseCommits', payload: { base } });
 
-    function handleClickOutside() {
+    function handleClickOutside(e: MouseEvent) {
+      if (!(e.target instanceof Element) || !e.target.closest('.action-dropdown, .action-badge')) {
+        showActionMenu = null;
+      }
+    }
+    function handleActionMenuEscape(e: KeyboardEvent) {
+      if (e.key !== 'Escape' || showActionMenu === null) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       showActionMenu = null;
     }
-    window.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleActionMenuEscape, true);
+    window.addEventListener('click', handleClickOutside, true);
     window.addEventListener('keydown', handleKeydown);
 
     return () => {
       window.removeEventListener('message', handleMessage);
-      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleActionMenuEscape, true);
+      window.removeEventListener('click', handleClickOutside, true);
       window.removeEventListener('keydown', handleKeydown);
     };
   });
@@ -619,22 +639,31 @@
   .todo-list {
     max-height: min(56vh, 560px);
     overflow-y: auto;
-    border: 1px solid var(--border-color);
     border-radius: 6px;
   }
 
   .todo-item {
-    display: flex;
+    position: relative;
+    display: grid;
+    grid-template-columns: 16px 92px minmax(0, 1fr) 20px;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     padding: 5px 8px;
-    border-bottom: 1px solid var(--border-color);
+    border: 1px solid var(--border-color);
+    border-top: none;
     font-size: inherit;
     transition: opacity 0.15s;
   }
 
+  .todo-item:first-child {
+    border-top: 1px solid var(--border-color);
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+  }
+
   .todo-item:last-child {
-    border-bottom: none;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
   }
 
   .todo-item:hover {
@@ -646,8 +675,17 @@
   }
 
   .todo-item.selected {
+    z-index: 1;
     background: var(--vscode-list-activeSelectionBackground, rgba(0, 127, 212, 0.18));
-    box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #007fd4);
+  }
+
+  .todo-item.selected::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border: 1px solid var(--vscode-focusBorder, #007fd4);
+    border-radius: inherit;
+    pointer-events: none;
   }
 
   .todo-item.dragging {
@@ -684,16 +722,17 @@
 
   .action-badge {
     display: inline-flex;
+    justify-content: center;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
+    padding: 2px 4px;
     border-radius: 4px;
     font-size: 10px;
     font-weight: 600;
     color: #fff;
     border: none;
     cursor: pointer;
-    min-width: 72px;
+    width: 100%;
     text-transform: uppercase;
   }
 
@@ -749,6 +788,7 @@
   }
 
   .todo-hash {
+    width: 7ch;
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 11px;
     color: var(--text-secondary);
@@ -756,8 +796,10 @@
   }
 
   .todo-subject {
-    flex: 1;
     min-width: 0;
+    padding: 4px 0;
+    border-block: 1px solid transparent;
+    line-height: 1.3;
   }
 
   .move-btns {
@@ -818,9 +860,11 @@
   }
 
   .todo-content {
-    display: flex;
+    margin-left: 1px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     flex: 1;
     min-width: 0;
   }
@@ -833,7 +877,7 @@
        Keep min-height in step with the one-line content + vertical padding. */
     min-height: 24px;
     max-height: 160px;
-    padding: 4px 6px;
+    padding: 4px 5px;
     background: var(--vscode-input-background, var(--bg-secondary));
     border: 1px solid var(--vscode-input-border, var(--border-color));
     border-radius: 3px;
@@ -842,11 +886,12 @@
     font-family: inherit;
     line-height: 1.3;
     resize: none;
-    overflow-y: auto;
+    overflow-y: hidden;
     outline: none;
   }
 
   .todo-message-input:focus {
+    overflow-y: auto;
     border-color: var(--vscode-focusBorder, #007fd4);
   }
 
@@ -858,8 +903,17 @@
     opacity: 0.8;
   }
 
+  .todo-item.squash-target::before,
+  .todo-item.squash-member::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #ff9800;
+    pointer-events: none;
+  }
+
   .todo-item.squash-target {
-    border-left: 3px solid #ff9800;
     background: rgba(255, 152, 0, 0.04);
   }
 
@@ -868,8 +922,6 @@
   }
 
   .todo-item.squash-member {
-    border-left: 3px solid #ff9800;
-    padding-left: 14px;
     background: rgba(255, 152, 0, 0.04);
   }
 
