@@ -42,7 +42,6 @@ beforeEach(() => {
   i18n.setLocale('en');
   authorColorsStore.colors = {};
   authorColorsStore.picker = null;
-  uiStore.autoFitColumns = false;
   uiStore.defaultCommitTab = 'details';
   uiStore.selectedCommitHash = null;
   uiStore.selectedCommitHashes = [];
@@ -87,14 +86,14 @@ describe('author highlight entry points', () => {
     const author = commit('first', 'alice@example.com');
     author.author.name = 'Alexandra Example';
     load([author]);
-    const { container, getByRole } = render(CommitGraph);
+    const { container } = render(CommitGraph);
     await tick();
     const graph = container.querySelector<HTMLElement>('.commit-graph')!;
     Object.defineProperty(graph, 'clientWidth', { value: 1000 });
     await fireEvent.resize(window);
     container.querySelector<HTMLElement>('.commit-row .col-author')!.style.fontSize = '13px';
-    await fireEvent.contextMenu(container.querySelector('.graph-header')!);
-    await fireEvent.click(getByRole('menuitem', { name: 'Auto-fit columns' }));
+    load([author]);
+    await tick();
     const expected = Math.ceil(author.author.name.length * 10 + 18 + 4 + 6 + 13 * 0.95 + 4 + 20);
     expect(parseFloat(graph.style.getPropertyValue('--author-width'))).toBe(expected);
   });

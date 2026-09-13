@@ -30,7 +30,6 @@ class UiStore {
 
   defaultCommitTab = $state<'details' | 'changes'>('details');
   diffMode = $state<'inline' | 'side-by-side'>('inline');
-  autoFitColumns = $state(false);
   dateTimeFormat = $state('DD.MM.YYYY HH:mm:ss');
   // Drives a "focus this commit in the graph" request (e.g. clicking a parent
   // link in the details panel). Nonce so repeated focus of the same hash

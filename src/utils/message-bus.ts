@@ -32,8 +32,6 @@ export type WebviewMessage =
   | { type: 'saveDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'getAuthorColors' }
   | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
-  | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
-  | { type: 'saveGraphColumns'; payload: { repo: string; widths: number[]; requestId?: string } }
   | { type: 'getLog'; payload: { repo?: string; branch?: string; branches?: string[]; limit?: number; skip?: number; loadMore?: boolean; remoteFilter?: string[] } }
   | { type: 'getBranches' }
   | { type: 'getRepoList' }

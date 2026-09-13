@@ -366,7 +366,7 @@
 
 <style>
   .search-bar {
-    padding: 5px 14px;
+    padding: 6px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
     flex-shrink: 0;
@@ -378,6 +378,7 @@
 
   .search-row {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 4px;

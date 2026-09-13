@@ -197,9 +197,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setDefaultCommitTab':
           uiStore.defaultCommitTab = msg.payload.tab;
           break;
-        case 'setAutoFitColumns':
-          uiStore.autoFitColumns = msg.payload.enabled;
-          break;
         case 'setDateTimeFormat':
           uiStore.dateTimeFormat = msg.payload.format;
           break;
@@ -583,20 +580,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
 
   <div class="content-area">
     {#if uiStore.viewMode === 'graph'}
-      {#if !bisectMessage}
-        <SearchBar
-          onResults={handleSearchResults}
-          onNavigate={handleSearchNavigate}
-          remotes={branchStore.remotes.map(r => r.name)}
-          {remoteFilter}
-          onFilterChange={handleFilterChange}
-          branches={branchStore.branches}
-          {branchFilter}
-          onBranchFilterChange={handleBranchFilterChange}
-          {headOffscreen}
-          onJumpToHead={handleJumpToHead}
-        />
-      {/if}
       {#if bisectMessage}
         <BisectBanner
           message={bisectMessage}
@@ -606,11 +589,25 @@ import AmendModal from './components/modals/AmendModal.svelte';
         />
       {/if}
       <div class="graph-layout" bind:this={graphLayout}>
-        {#if !uiStore.commitDetailFullscreen}
-          <div class="graph-area">
+        <div class="graph-area" class:hidden={uiStore.commitDetailFullscreen}>
+          {#if !bisectMessage}
+            <SearchBar
+              onResults={handleSearchResults}
+              onNavigate={handleSearchNavigate}
+              remotes={branchStore.remotes.map(r => r.name)}
+              {remoteFilter}
+              onFilterChange={handleFilterChange}
+              branches={branchStore.branches}
+              {branchFilter}
+              onBranchFilterChange={handleBranchFilterChange}
+              {headOffscreen}
+              onJumpToHead={handleJumpToHead}
+            />
+          {/if}
+          {#if !uiStore.commitDetailFullscreen}
             <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} onHeadOffscreenChange={(v) => headOffscreen = v} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
-          </div>
-        {/if}
+          {/if}
+        </div>
         {#if uiStore.showBottomPanel && (uiStore.alwaysShowCommitDetails || uiStore.selectedCommitHash || uiStore.comparing)}
           {#if !uiStore.commitDetailFullscreen}
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -1208,9 +1205,15 @@ import AmendModal from './components/modals/AmendModal.svelte';
 
   .graph-area {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .graph-area.hidden {
+    display: none;
   }
 
   .log-container, .stats-container {

@@ -233,9 +233,6 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.defaultCommitTab')) {
           this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
         }
-        if (e.affectsConfiguration('gitGraphPlus.autoFitColumns')) {
-          this.post({ type: 'setAutoFitColumns', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('autoFitColumns', false) } });
-        }
         if (e.affectsConfiguration('gitGraphPlus.dateTimeFormat')) {
           this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
         }
@@ -288,7 +285,6 @@ export class MainPanel {
     this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });
     this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
     this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
-    this.post({ type: 'setAutoFitColumns', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('autoFitColumns', false) } });
     this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
     void this.postCommitLinkRules();
 
@@ -488,20 +484,6 @@ export class MainPanel {
           const colors = Object.fromEntries(entries.filter(([key]) => key.trim().toLowerCase() !== normalizedEmail));
           await configuration.update('authorColors', color === null ? colors : { ...colors, [normalizedEmail]: color }, vscode.ConfigurationTarget.Global);
           this.post({ type: 'authorColor', payload: { email: normalizedEmail, color } });
-          break;
-        }
-        case 'getGraphColumns':
-        case 'saveGraphColumns': {
-          const { repo, requestId } = message.payload;
-          if (typeof repo !== 'string' || !samePath(repo, this.repoPath)) break;
-          const key = `graphColumns:${vscode.Uri.file(repo).fsPath}`;
-          if (message.type === 'saveGraphColumns') {
-            const widths = message.payload.widths;
-            if (!Array.isArray(widths) || widths.length !== 3 || !widths.every(w => typeof w === 'number' && Number.isFinite(w) && w >= 0 && w <= 100000)) break;
-            await MainPanel.globalState?.update(key, widths);
-          } else {
-            this.post({ type: 'graphColumns', payload: { repo, requestId, widths: MainPanel.globalState?.get(key) } });
-          }
           break;
         }
         case 'getLog': {

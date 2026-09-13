@@ -375,14 +375,11 @@
 
   const MIN_MESSAGE_WIDTH = 120;
   const MIN_COLUMN_WIDTHS = [70, 55, 70];
-  let preferredWidths = $state([120, 75, 150]);
   let fittedWidths = $state([120, 75, 150]);
-  let columnRequest: string | null = null;
-  let resize: { index: number; x: number; widths: number[]; repo: string } | null = null;
   const minimumScale = $derived(Math.min(1, viewportWidth / (MIN_MESSAGE_WIDTH + 195)));
   const minimumWidths = $derived(MIN_COLUMN_WIDTHS.map(w => w * minimumScale));
   const columnWidths = $derived.by(() => {
-    const widths = (uiStore.autoFitColumns ? fittedWidths : preferredWidths).map((w, i) => Math.max(minimumWidths[i], w));
+    const widths = fittedWidths.map((w, i) => Math.max(minimumWidths[i], w));
     const budget = Math.max(0, viewportWidth - MIN_MESSAGE_WIDTH * minimumScale);
     const extra = widths.reduce((sum, w, i) => sum + w - minimumWidths[i], 0);
     const scale = extra > 0 ? Math.min(1, Math.max(0, budget - 195 * minimumScale) / extra) : 0;
@@ -392,66 +389,17 @@
   const maxGraphWidth = $derived(Math.max(0, descriptionWidth - Math.min(MIN_MESSAGE_WIDTH, descriptionWidth * 0.6)));
 
   $effect(() => {
-    const repo = uiStore.activeRepo;
-    preferredWidths = [120, 75, 150];
-    resize = null;
+    uiStore.activeRepo;
     contextMenu = null;
-    const requestId = crypto.randomUUID();
-    columnRequest = requestId;
-    function receiveColumns(event: MessageEvent) {
-      const msg = event.data;
-      if (msg?.type !== 'graphColumns' || msg.payload?.repo !== repo || uiStore.activeRepo !== repo || msg.payload?.requestId !== columnRequest) return;
-      const widths = msg.payload.widths;
-      if (Array.isArray(widths) && widths.length === 3 && widths.every(w => typeof w === 'number' && Number.isFinite(w) && w >= 0 && w <= 100000)) {
-        preferredWidths = widths;
-      }
-    }
-    window.addEventListener('message', receiveColumns);
-    if (repo) vscode.postMessage({ type: 'getGraphColumns', payload: { repo, requestId } });
-    return () => window.removeEventListener('message', receiveColumns);
   });
 
   $effect(() => {
-    if (!uiStore.autoFitColumns) return;
-    resize = null;
     contextMenu = null;
     if (commitStore.loading || !container) return;
     displayCommits;
     uiStore.dateTimeFormat;
-    t('graph.author');
     fittedWidths = untrack(measureColumnWidths);
   });
-
-  function saveColumns() {
-    columnRequest = null;
-    if (uiStore.activeRepo) vscode.postMessage({ type: 'saveGraphColumns', payload: { repo: uiStore.activeRepo, widths: [...preferredWidths] } });
-  }
-
-  function resizeColumn(index: number, delta: number, widths = columnWidths) {
-    const left = index === 0 ? viewportWidth - widths.reduce((a, b) => a + b, 0) : widths[index - 1];
-    const leftMinimum = index === 0 ? MIN_MESSAGE_WIDTH * minimumScale : minimumWidths[index - 1];
-    const change = Math.max(leftMinimum - left, Math.min(widths[index] - minimumWidths[index], delta));
-    preferredWidths = widths.map((w, i) => i === index ? w - change : i === index - 1 ? w + change : w);
-  }
-
-  function startResize(event: PointerEvent, index: number) {
-    if (event.button !== 0 || uiStore.autoFitColumns) return;
-    event.preventDefault();
-    columnRequest = null;
-    contextMenu = null;
-    resize = { index, x: event.clientX, widths: [...columnWidths], repo: uiStore.activeRepo };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  }
-
-  function moveResize(event: PointerEvent) {
-    if (!uiStore.autoFitColumns && resize && resize.repo === uiStore.activeRepo) resizeColumn(resize.index, event.clientX - resize.x, resize.widths);
-  }
-
-  function finishResize() {
-    if (!resize) return;
-    if (!uiStore.autoFitColumns && resize.repo === uiStore.activeRepo) saveColumns();
-    resize = null;
-  }
 
   function measureColumnWidths() {
     if (!container) return [...MIN_COLUMN_WIDTHS];
@@ -459,12 +407,9 @@
     if (!context) return [...MIN_COLUMN_WIDTHS];
     const classes = ['author', 'hash', 'date'];
     return classes.map((name, index) => {
-      const header = container!.querySelector(`.graph-header .col-${name} .header-label`);
       const cell = container!.querySelector(`.commit-row .col-${name}`);
-      if (!header || !cell) return MIN_COLUMN_WIDTHS[index];
-      const headerStyle = getComputedStyle(header);
-      context.font = headerStyle.font;
-      let width = context.measureText(header.textContent!.toUpperCase()).width + 20;
+      if (!cell) return MIN_COLUMN_WIDTHS[index];
+      let width = MIN_COLUMN_WIDTHS[index];
       const cellStyle = getComputedStyle(cell);
       context.font = cellStyle.font;
       for (const commit of displayCommits) {
@@ -475,19 +420,6 @@
       }
       return Math.max(MIN_COLUMN_WIDTHS[index], Math.min(100000, Math.ceil(width)));
     });
-  }
-
-  function autoFitColumns() {
-    if (uiStore.autoFitColumns) return;
-    preferredWidths = measureColumnWidths();
-    saveColumns();
-  }
-
-  function headerContextMenu(event: MouseEvent) {
-    event.preventDefault();
-    if (uiStore.autoFitColumns) return;
-    contextMenuHash = null;
-    contextMenu = { x: event.clientX, y: event.clientY, items: [{ label: 'Auto-fit columns', action: autoFitColumns }] };
   }
 
   // Bring a row into view when it is off-screen. 'edge' (keyboard stepping)
@@ -1472,28 +1404,6 @@
       <div class="col-date" use:tooltip={commit.hash !== 'UNCOMMITTED' ? formatDate(commit.author.date) : ''}>{commit.hash !== 'UNCOMMITTED' ? formatDate(commit.author.date) : ''}</div>
     {/snippet}
 
-    <!-- Column headers -->
-    <div class="graph-header" role="row" tabindex="0" oncontextmenu={headerContextMenu}>
-      {#each ['message', 'author', 'hash', 'date'] as name, index}
-        <div class="col-{name}" role="columnheader">
-          <span class="header-label">{t(['graph.description', 'graph.author', 'graph.sha', 'graph.date'][index])}</span>
-          {#if index < 3 && !uiStore.autoFitColumns}
-            <button
-              class="column-resize"
-              aria-label="Resize {t(['graph.description', 'graph.author', 'graph.sha'][index])} and {t(['graph.author', 'graph.sha', 'graph.date'][index])} columns"
-              tabindex="-1"
-              title="Drag to resize"
-              onpointerdown={(event) => startResize(event, index)}
-              onpointermove={moveResize}
-              onpointerup={finishResize}
-              onpointercancel={finishResize}
-              onlostpointercapture={finishResize}
-            ></button>
-          {/if}
-        </div>
-      {/each}
-    </div>
-
     <!-- Virtual scroll container -->
     <div
       class="scroll-content"
@@ -1990,7 +1900,8 @@
 <style>
   /* ---- Layout ---- */
   .commit-graph {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     position: relative;
@@ -2035,56 +1946,6 @@
   .load-more-btn:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-
-  /* ---- Header ---- */
-  .graph-header {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.9em;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-
-  .graph-header > div {
-    padding: 0 var(--column-padding);
-    position: relative;
-    height: 100%;
-    display: flex;
-    align-items: center;
-  }
-
-  .header-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .column-resize {
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 6px;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    border-right: 1px solid var(--border-color);
-    border-radius: 0;
-    background: transparent;
-    cursor: ew-resize;
-    touch-action: none;
-  }
-
-  .column-resize:hover, .column-resize:focus-visible {
-    background: var(--vscode-focusBorder, #007fd4);
-    outline-offset: -2px;
   }
 
   /* ---- SVG layer - must be ABOVE rows so nodes/lines are visible ---- */
@@ -2291,10 +2152,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .graph-header .col-hash {
-    font-family: inherit;
   }
 
   .commit-subject {
