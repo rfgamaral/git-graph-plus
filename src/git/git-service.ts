@@ -538,7 +538,7 @@ export class GitService {
     // Resolve stashes before running the log: their base commits may need to be
     // added as extra walk start points (below). stashList() is deduped/cached,
     // so awaiting it here doesn't add a round-trip versus the old Promise.all.
-    const stashes = await this.stashList();
+    const stashes = options?.showStashEntries === false ? [] : await this.stashList();
 
     // Include each stash's base commit as an extra rev-list start point so git
     // walks the stash's ancestry down to where it rejoins the main history.

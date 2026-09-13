@@ -8,6 +8,7 @@
     action: () => void;
     danger?: boolean;
     disabled?: boolean;
+    checked?: boolean;
     separator?: boolean;
     children?: MenuItem[];
   }
@@ -81,7 +82,7 @@
 >
   {#each items as item, idx}
     {#if item.separator}
-      <div class="separator"></div>
+      <div class="separator" role="separator"></div>
     {:else if item.children}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="submenu-wrapper" onmouseleave={() => { activeSubmenu = null; }}>
@@ -109,16 +110,17 @@
           <div class="submenu" class:on-left={submenuOnLeft} style="top: calc(-5px + {submenuOffsetY}px);" role="menu" tabindex="-1">
             {#each item.children as child}
               {#if child.separator}
-                <div class="separator"></div>
+                <div class="separator" role="separator"></div>
               {:else}
                 <button
                   class="menu-item"
                   class:danger={child.danger}
                   disabled={child.disabled}
                   onclick={() => { child.action(); onClose(); }}
-                  role="menuitem"
+                  role={child.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                  aria-checked={child.checked}
                 >
-                  {#if child.icon}<i class="codicon codicon-{child.icon} menu-icon"></i>{/if}
+                  {#if child.checked !== undefined}<i class="codicon codicon-check menu-icon" style:visibility={child.checked ? 'visible' : 'hidden'}></i>{:else if child.icon}<i class="codicon codicon-{child.icon} menu-icon"></i>{/if}
                   {child.label}
                 </button>
               {/if}
@@ -133,9 +135,10 @@
         disabled={item.disabled}
         onmouseenter={() => { activeSubmenu = null; }}
         onclick={() => { item.action(); onClose(); }}
-        role="menuitem"
+        role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        aria-checked={item.checked}
       >
-        {#if item.icon}<i class="codicon codicon-{item.icon} menu-icon"></i>{/if}
+        {#if item.checked !== undefined}<i class="codicon codicon-check menu-icon" style:visibility={item.checked ? 'visible' : 'hidden'}></i>{:else if item.icon}<i class="codicon codicon-{item.icon} menu-icon"></i>{/if}
         {item.label}
       </button>
     {/if}

@@ -14,11 +14,6 @@
 
   const vscode = getVsCodeApi();
 
-  interface Props {
-    onRefresh?: () => void;
-  }
-  let { onRefresh = () => {} }: Props = $props();
-
   let showAddRemote = $state(false);
   let showRepoDropdown = $state(false);
   let showFlowDropdown = $state(false);
@@ -26,11 +21,6 @@
   let flowStatus = $state<FlowStatus | null>(null);
   let flowBranches = $state<FlowBranches>({ features: [], releases: [], hotfixes: [] });
   let showNoRemotesError = $state(false);
-
-  function refresh() {
-    uiStore.operating = 'refresh';
-    onRefresh();
-  }
 
   function switchToGraph() {
     uiStore.viewMode = 'graph';
@@ -386,14 +376,6 @@
       {/if}
     </div>
     <span class="separator"></span>
-    <button
-      class="toolbar-btn"
-      onclick={refresh}
-      disabled={uiStore.operating !== null}
-      use:tooltip={t('toolbar.refresh')}
-    >
-      {#if uiStore.operating === 'refresh'}<span class="spinner"></span>{:else}<i class="codicon codicon-refresh"></i>{/if}
-    </button>
     <button
       class="toolbar-btn"
       onclick={() => { vscode.postMessage({ type: 'openExtensionSettings' }); }}

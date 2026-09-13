@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { getVsCodeApi } from '../../lib/vscode-api';
+  import ContextMenu from './ContextMenu.svelte';
+  import { uiStore } from '../../lib/stores/ui.svelte';
   import { onDestroy, untrack } from 'svelte';
   import { readViewState, writeViewState } from '../../lib/view-state';
   import { commitStore } from '../../lib/stores/commits.svelte';
@@ -17,6 +20,7 @@
     branchFilter?: string[];
     onBranchFilterChange?: (filter: string[]) => void;
     onJumpToHead?: () => void;
+    onRefresh?: () => void;
   }
 
   let {
@@ -30,6 +34,7 @@
     branchFilter = [],
     onBranchFilterChange = () => {},
     onJumpToHead = () => {},
+    onRefresh = () => {},
   }: Props = $props();
 
   const saved = readViewState('search', { query: '', currentIndex: -1 });
@@ -44,6 +49,25 @@
   let filterOpen = $state(false);
   let branchFilterOpen = $state(false);
   let branchQuery = $state('');
+  let viewMenu = $state<{ x: number; y: number } | null>(null);
+
+  function toggleViewOption(option: 'showTagLabels' | 'showStashEntries') {
+    uiStore.graphViewOptions = { ...uiStore.graphViewOptions, [option]: !uiStore.graphViewOptions[option] };
+    if (option === 'showStashEntries') commitStore.setLoading(true);
+    getVsCodeApi().postMessage({ type: 'saveGraphViewOptions', payload: { repo: uiStore.activeRepo, ...uiStore.graphViewOptions } });
+  }
+
+  function refresh() {
+    uiStore.operating = 'refresh';
+    onRefresh();
+  }
+
+  function onWindowKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || !viewMenu) return;
+    viewMenu = null;
+    event.stopImmediatePropagation();
+    event.preventDefault();
+  }
 
   const filterActive = $derived(remoteFilter.length > 0);
 
@@ -160,6 +184,10 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && viewMenu) {
+      onWindowKeydown(e);
+      return;
+    }
     if (e.key === 'Enter') {
       if (e.shiftKey) {
         navigatePrev();
@@ -222,6 +250,8 @@
     onFilterChange([]);
   }
 </script>
+
+<svelte:window onkeydown={onWindowKeydown} />
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="search-bar" role="group" onkeydown={handleKeydown}>
@@ -376,9 +406,44 @@
       </div>
     {/if}
   </div>
+  <button
+    class="view-btn"
+    onclick={(event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      viewMenu = viewMenu ? null : { x: rect.left, y: rect.bottom + 4 };
+    }}
+    aria-label={t('toolbar.view')}
+    aria-haspopup="menu"
+    aria-expanded={viewMenu !== null}
+    use:tooltip={t('toolbar.view')}
+  >
+    <i class="codicon codicon-settings filter-btn-icon"></i>
+    <span class="filter-label">{t('toolbar.view')}</span>
+    <i class="codicon codicon-chevron-down chevron"></i>
+  </button>
 </div>
 
+{#if viewMenu}
+  <div class="view-menu">
+    <ContextMenu
+      x={viewMenu.x}
+      y={viewMenu.y}
+      items={[
+        { label: t('toolbar.showTagLabels'), checked: uiStore.graphViewOptions.showTagLabels, action: () => toggleViewOption('showTagLabels'), disabled: !uiStore.activeRepo },
+        { label: t('toolbar.showStashEntries'), checked: uiStore.graphViewOptions.showStashEntries, action: () => toggleViewOption('showStashEntries'), disabled: !uiStore.activeRepo || commitStore.loading || uiStore.operating !== null },
+        { label: '', separator: true, action: () => {} },
+        { label: t('toolbar.refresh'), icon: 'refresh', action: refresh, disabled: uiStore.operating !== null },
+      ]}
+      onClose={() => { viewMenu = null; }}
+    />
+  </div>
+{/if}
+
 <style>
+  .view-menu :global(.context-menu) {
+    min-width: 140px;
+  }
+
   .search-bar {
     height: var(--pane-toolbar-height);
     padding: 5px;
@@ -547,7 +612,7 @@
     cursor: default;
   }
 
-  .filter-btn {
+  .filter-btn, .view-btn {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -578,7 +643,7 @@
     gap: 4px;
   }
 
-  .filter-btn:hover {
+  .filter-btn:hover, .view-btn:hover {
     color: var(--text-primary);
     border-color: var(--vscode-focusBorder, #007fd4);
   }
@@ -590,7 +655,7 @@
 
   .chevron { font-size: 14px; opacity: 0.7; flex-shrink: 0; }
 
-  .filter-btn:hover .chevron {
+  .filter-btn:hover .chevron, .view-btn:hover .chevron {
     opacity: 1;
   }
 

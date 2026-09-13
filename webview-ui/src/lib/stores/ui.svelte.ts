@@ -45,6 +45,7 @@ class UiStore {
   operating = $state<string | null>(null);
   badgeBarWidth = $state(4);
   graphLaneSpacing = $state(13);
+  graphViewOptions = $state({ showTagLabels: true, showStashEntries: true });
   loadMoreCount = $state(50);
   interactiveRebaseMode = $state<InteractiveRebaseMode>('ui');
   // True while a file is selected in the commit-details panel. Owned (synced)

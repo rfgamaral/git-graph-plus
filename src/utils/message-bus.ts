@@ -1,5 +1,10 @@
 import type { CommitGraphData, BranchData, DiffData, Commit, WorktreeInfo, CommitSignature } from '../git/types';
 
+export interface GraphViewOptions {
+  showTagLabels: boolean;
+  showStashEntries: boolean;
+}
+
 export interface LinkRule {
   pattern: string;
   url: string;
@@ -33,6 +38,7 @@ export type WebviewMessage =
   | { type: 'saveDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'getAuthorColors' }
   | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
+  | { type: 'saveGraphViewOptions'; payload: GraphViewOptions & { repo: string } }
   | { type: 'getLog'; payload: { repo?: string; branch?: string; branches?: string[]; limit?: number; skip?: number; loadMore?: boolean; remoteFilter?: string[] } }
   | { type: 'getBranches' }
   | { type: 'getRepoList' }
@@ -178,7 +184,7 @@ export type ExtensionMessage =
   | { type: 'setGraphLaneSpacing'; payload: { spacing: number } }
   | { type: 'setGraphColors'; payload: { colors: string[] } }
   | { type: 'setCommitLinkRules'; payload: { rules: LinkRule[] } }
-  | { type: 'repoList'; payload: { repos: Array<{ path: string; name: string; type: 'root' | 'submodule' | 'nested' }>; active: string } }
+  | { type: 'repoList'; payload: { repos: Array<{ path: string; name: string; type: 'root' | 'submodule' | 'nested' }>; active: string; viewOptions: GraphViewOptions } }
   | { type: 'worktreeData'; payload: WorktreeInfo[] }
   | { type: 'uncommittedDiffData'; payload: { staged: Array<{ path: string; status: string }>; unstaged: Array<{ path: string; status: string }> } }
   | { type: 'multiCommitSectionsData'; payload: { files: Array<{ path: string; status: string }>; sections: Array<{ file: string; commit: string; diff: DiffData }> } }

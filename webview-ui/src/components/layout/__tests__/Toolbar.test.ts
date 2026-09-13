@@ -15,7 +15,6 @@ const iconBtn = (c: HTMLElement, icon: string) =>
 const getFetch = (c: HTMLElement) => iconBtn(c, 'cloud-download');
 const getPull = (c: HTMLElement) => iconBtn(c, 'arrow-down');
 const getPush = (c: HTMLElement) => iconBtn(c, 'arrow-up');
-const getRefresh = (c: HTMLElement) => iconBtn(c, 'refresh');
 const getStash = (c: HTMLElement) => iconBtn(c, 'archive');
 const getFlow = (c: HTMLElement) =>
   c.querySelector<HTMLButtonElement>('.flow-wrapper .split-chevron')!;
@@ -123,14 +122,6 @@ describe('Toolbar — fetch / pull / push', () => {
 });
 
 describe('Toolbar — refresh', () => {
-  it('refresh button calls onRefresh and flips operating to "refresh"', async () => {
-    const onRefresh = vi.fn();
-    const { container } = render(Toolbar, { onRefresh });
-    await fireEvent.click(getRefresh(container));
-    expect(onRefresh).toHaveBeenCalled();
-    expect(uiStore.operating).toBe('refresh');
-  });
-
   it('disables toolbar buttons while operating', async () => {
     uiStore.operating = 'refresh';
     const { container } = render(Toolbar);

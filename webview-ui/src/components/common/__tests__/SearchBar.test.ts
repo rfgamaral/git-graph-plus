@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { getVsCodeApi } from '../../../lib/vscode-api';
+import { uiStore } from '../../../lib/stores/ui.svelte';
 import SearchBar from '../SearchBar.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import { commitStore } from '../../../lib/stores/commits.svelte';
@@ -391,4 +392,20 @@ it('restores and clamps the current search result after loading without navigati
     getState.mockRestore();
     vi.useRealTimers();
   }
+});
+
+describe('SearchBar — View menu', () => {
+  it('Refresh in the View menu calls onRefresh and flips operating to "refresh"', async () => {
+    const onRefresh = vi.fn();
+    const { container } = render(SearchBar, { ...baseProps, onRefresh });
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('[aria-label="View"]')!);
+    const refresh = container.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
+    expect(refresh.textContent).toContain('Refresh');
+    await fireEvent.click(refresh);
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(onRefresh).toHaveBeenCalled();
+    expect(uiStore.operating).toBe('refresh');
+    uiStore.operating = null;
+  });
+
 });

@@ -16,7 +16,7 @@ import { AvatarCache } from '../services/avatar-cache';
 import { loadGitHubImage } from '../services/github-image';
 import { resolveGitDirs, shouldRefreshGraph } from '../services/file-watcher-helpers';
 import { RepoDiscoveryService, RepoInfo } from '../services/repo-discovery';
-import type { WebviewMessage, ModalDefaults } from '../utils/message-bus';
+import type { WebviewMessage, ModalDefaults, GraphViewOptions } from '../utils/message-bus';
 import { resolveCommitLinkRules, type LinkRule } from '../git/commit-link-rules';
 import {
   resolveRepoRelativePath as resolveRepoRelativePathUtil,
@@ -49,6 +49,7 @@ export class MainPanel {
   private disposables: vscode.Disposable[] = [];
   private allConflictFiles: string[] = [];
   private currentLimit = 1000;
+  private graphViewOptions: GraphViewOptions = { showTagLabels: true, showStashEntries: true };
   private currentRemoteFilter: string[] | undefined = undefined;
   private currentBranchFilter: string[] | undefined = undefined;
   private pendingFilterRestore: Promise<void> | undefined;
@@ -200,6 +201,7 @@ export class MainPanel {
     this.panel = panel;
     this.extensionUri = extensionUri;
     this.repoPath = repoPath;
+    this.restoreGraphViewOptions();
     this.gitService = this.createGitService(repoPath);
 
     this.fileWatcher = new FileWatcher(repoPath, (what) => {
@@ -367,6 +369,7 @@ export class MainPanel {
    */
   private swapRepo(newPath: string): void {
     this.repoPath = newPath;
+    this.restoreGraphViewOptions();
     this.gitService = this.createGitService(newPath);
 
     this.allConflictFiles = [];
@@ -392,7 +395,7 @@ export class MainPanel {
 
     this.post({
       type: 'repoList',
-      payload: { repos: this.cachedRepos, active: this.repoPath },
+      payload: { repos: this.cachedRepos, active: this.repoPath, viewOptions: this.graphViewOptions },
     });
 
     await this.refreshAll();
@@ -498,6 +501,19 @@ export class MainPanel {
           this.post({ type: 'authorColor', payload: { email: normalizedEmail, color } });
           break;
         }
+        case 'saveGraphViewOptions': {
+          const { repo, showTagLabels, showStashEntries } = message.payload;
+          if (typeof repo !== 'string' || !samePath(repo, this.repoPath)
+            || typeof showTagLabels !== 'boolean' || typeof showStashEntries !== 'boolean') break;
+          const reload = showStashEntries !== this.graphViewOptions.showStashEntries;
+          this.graphViewOptions = { showTagLabels, showStashEntries };
+          const seq = reload ? ++this.logSequence : this.logSequence;
+          await MainPanel.globalState?.update(`graphViewOptions:${vscode.Uri.file(this.repoPath).fsPath}`, this.graphViewOptions);
+          if (reload && !this.disposed && seq === this.logSequence && samePath(repo, this.repoPath)) {
+            await this.handleMessage({ type: 'getLog', payload: { repo, limit: this.currentLimit } });
+          }
+          break;
+        }
         case 'getLog': {
           if (message.payload.repo !== undefined && (typeof message.payload.repo !== 'string' || !samePath(message.payload.repo, this.repoPath))) break;
           if ([message.payload.remoteFilter, message.payload.branches].some(value => value !== undefined && (!Array.isArray(value) || !value.every(item => typeof item === 'string')))) break;
@@ -525,7 +541,7 @@ export class MainPanel {
           this.currentBranchFilter = effectiveBranchFilter;
           this.saveLogFilters();
           if (supersededRefresh) void this.refreshAll();
-          const logPayload = { ...message.payload, loadMore: loadMore === true, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature };
+          const logPayload = { ...message.payload, loadMore: loadMore === true, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries };
           const [allFetched, logBranches] = await Promise.all([
             gitService.log(logPayload),
             gitService.branches(),
@@ -1621,7 +1637,7 @@ export class MainPanel {
           // Send this BEFORE refreshAll so the dropdown updates instantly.
           this.post({
             type: 'repoList',
-            payload: { repos: this.cachedRepos, active: this.repoPath },
+            payload: { repos: this.cachedRepos, active: this.repoPath, viewOptions: this.graphViewOptions },
           });
 
           await this.refreshAll();
@@ -1875,6 +1891,14 @@ export class MainPanel {
     }
   }
 
+  private restoreGraphViewOptions(): void {
+    const saved = MainPanel.globalState?.get<Partial<GraphViewOptions>>(`graphViewOptions:${vscode.Uri.file(this.repoPath).fsPath}`);
+    this.graphViewOptions = {
+      showTagLabels: saved?.showTagLabels !== false,
+      showStashEntries: saved?.showStashEntries !== false,
+    };
+  }
+
   private saveLogFilters(): void {
     const remoteFilter = this.currentRemoteFilter ?? [];
     const branches = this.currentBranchFilter ?? [];
@@ -1952,7 +1976,7 @@ export class MainPanel {
       const refreshLimit = this.currentLimit || readInitialCommitCount();
       const remoteFilter = this.currentRemoteFilter;
       const branchFilter = this.currentBranchFilter;
-      const logArgs = { limit: refreshLimit + 1, loadMore: false, sortOrder, remoteFilter, branches: branchFilter, includeSignature };
+      const logArgs = { limit: refreshLimit + 1, loadMore: false, sortOrder, remoteFilter, branches: branchFilter, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
         const hasMore = allFetched.length > refreshLimit;
@@ -2052,7 +2076,7 @@ export class MainPanel {
 
       this.post({
         type: 'repoList',
-        payload: { repos, active },
+        payload: { repos, active, viewOptions: this.graphViewOptions },
       });
     } catch {
       // ignore

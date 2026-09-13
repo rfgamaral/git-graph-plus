@@ -294,6 +294,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
           }
           uiStore.repos = msg.payload.repos;
           uiStore.activeRepo = msg.payload.active;
+          uiStore.graphViewOptions = {
+            showTagLabels: msg.payload.viewOptions?.showTagLabels !== false,
+            showStashEntries: msg.payload.viewOptions?.showStashEntries !== false,
+          };
           saveRepoPath(msg.payload.active);
           commitStore.notGitRepo = false;
           break;
@@ -561,17 +565,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
 </script>
 
 <div class="app-container" class:resizing class:details-right={uiStore.commitDetailsPosition === 'right'}>
-  <Toolbar onRefresh={() => {
-    commitStore.setLoading(true);
-    vscode.postMessage({ type: 'getLog', payload: {
-      repo: uiStore.activeRepo || undefined,
-      limit: commitStore.currentLimit || undefined,
-      branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
-      remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
-    }});
-    vscode.postMessage({ type: 'getBranches' });
-    vscode.postMessage({ type: 'getRepoList' });
-  }} />
+  <Toolbar />
 
   {#if conflict}
     <div class="conflict-banner banner-card" transition:slide={{ duration: 150 }}>
@@ -670,6 +664,17 @@ import AmendModal from './components/modals/AmendModal.svelte';
         <div class="graph-area" class:hidden={uiStore.commitDetailFullscreen}>
           {#if !bisectMessage}
             <SearchBar
+              onRefresh={() => {
+                commitStore.setLoading(true);
+                vscode.postMessage({ type: 'getLog', payload: {
+                  repo: uiStore.activeRepo || undefined,
+                  limit: commitStore.currentLimit || undefined,
+                  branches: branchFilter.length > 0 ? [...branchFilter] : undefined,
+                  remoteFilter: remoteFilter.length > 0 ? [...remoteFilter] : undefined,
+                }});
+                vscode.postMessage({ type: 'getBranches' });
+                vscode.postMessage({ type: 'getRepoList' });
+              }}
               onResults={handleSearchResults}
               onNavigate={handleSearchNavigate}
               onCurrentResult={(hash) => { searchCurrentHash = hash; }}

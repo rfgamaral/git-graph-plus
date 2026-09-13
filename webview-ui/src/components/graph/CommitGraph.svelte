@@ -1500,7 +1500,7 @@
                 <span class="remote-dot" use:tooltip={t('graph.remoteOnly')}></span>
               {/if}
               {#each commit.refs.filter(r => {
-                  if (r.type === 'working-dir') return false;
+                  if (r.type === 'working-dir' || (r.type === 'tag' && !uiStore.graphViewOptions.showTagLabels)) return false;
                   if (r.type === 'remote-branch') {
                     if (r.name === 'HEAD') return false;
                     if (remoteFilter.length > 0 && !remoteFilter.includes(r.remote ?? '')) return false;
