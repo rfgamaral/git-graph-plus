@@ -1065,6 +1065,20 @@ describe('App — modal action callbacks (exhaustive)', () => {
     });
   });
 
+  it('PushModal forwards the configured push remote instead of the upstream remote', async () => {
+    commonBranchState();
+    branchStore.branches[0].pushRemote = 'fork';
+    branchStore.remotes.push({ name: 'fork', fetchUrl: '', pushUrl: '' });
+    const { container } = render(App);
+    modalStore.openPush('origin');
+    await waitFor(() => expect(container.querySelector('.modal button.primary')).not.toBeNull());
+    globalThis.__postedMessages = [];
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.modal button.primary')!);
+    expect(globalThis.__postedMessages.map(message => message.data)).toContainEqual({
+      type: 'push', payload: { remote: 'fork', branch: 'main', remoteBranch: 'main', force: undefined, setUpstream: true },
+    });
+  });
+
   it('PushModal — onPush posts push with computed force/setUpstream', async () => {
     commonBranchState();
     render(App);

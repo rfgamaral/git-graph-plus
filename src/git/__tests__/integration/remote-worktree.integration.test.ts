@@ -31,6 +31,27 @@ describe('GitService integration — remote operations (local bare)', () => {
       expect(bareHead).toBe(head(workRepo.path));
     });
 
+    it.each(['remote.pushDefault', 'branch.main.pushRemote'])('uses %s instead of the fetch upstream when pushing', async (setting) => {
+      const fork = createTempRepo({ bare: true });
+      try {
+        svc.setExtraEnv({ GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' });
+        await svc.push('origin', 'main', { setUpstream: true });
+        const upstreamHead = head(workRepo.path);
+        runGit(workRepo.path, ['remote', 'add', 'fork', fork.path]);
+        runGit(workRepo.path, ['config', 'remote.pushDefault', 'origin']);
+        runGit(workRepo.path, ['config', setting, 'fork']);
+        const nextHead = commit(workRepo.path, 'for the fork');
+        const current = (await svc.branches()).find(branch => branch.current)!;
+        expect(current.upstream).toBe('origin/main');
+        expect(current.pushRemote).toBe('fork');
+        await svc.push(current.pushRemote, current.name, { remoteBranch: current.name, setUpstream: false });
+        expect(runGit(fork.path, ['rev-parse', 'main']).trim()).toBe(nextHead);
+        expect(runGit(bareRepo.path, ['rev-parse', 'main']).trim()).toBe(upstreamHead);
+      } finally {
+        fork.cleanup();
+      }
+    });
+
     it('fetch downloads new commits from another clone', async () => {
       // First push from work → bare
       await svc.push('origin', 'main', { setUpstream: true });

@@ -903,16 +903,15 @@ import AmendModal from './components/modals/AmendModal.svelte';
     branchName={pushBranchName}
     {hasUpstream}
     upstream={branchStore.currentBranch?.upstream ?? ''}
+    pushRemote={branchStore.currentBranch?.pushRemote}
     remotes={branchStore.remotes}
     initialRemote={modalStore.push.remote}
     onClose={() => { modalStore.closePush(); }}
-    onPush={({ forceMode, setUpstream, remote, allTags }) => {
+    onPush={({ forceMode, setUpstream, remote, remoteBranch, allTags }) => {
       const force = forceMode === 'none' ? undefined : forceMode;
-      const remoteArg = hasUpstream ? undefined : remote;
-      const branchArg = hasUpstream ? undefined : pushBranchName;
       modalStore.closePush();
       uiStore.operating = 'push';
-      vscode.postMessage({ type: 'push', payload: { remote: remoteArg, branch: branchArg, force, setUpstream: !hasUpstream && setUpstream } });
+      vscode.postMessage({ type: 'push', payload: { remote, branch: pushBranchName, remoteBranch, force, setUpstream } });
       if (allTags) vscode.postMessage({ type: 'pushAllTags', payload: { remote } });
     }}
   />

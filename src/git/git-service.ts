@@ -714,7 +714,7 @@ export class GitService {
   async branches(): Promise<BranchInfo[]> {
     return this.dedupe('branches', async () => {
       const raw = await this.exec([
-        'branch', '-a', '--format=%(HEAD)%(refname:short)%00%(objectname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(refname)',
+        'branch', '-a', '--format=%(HEAD)%(refname:short)%00%(objectname:short)%00%(upstream:short)%00%(upstream:track,nobracket)%00%(refname)%00%(push:remotename)',
       ]);
       return parseBranches(raw);
     });
@@ -1439,7 +1439,15 @@ export class GitService {
     return this.execWithAuthRetry(args, remote);
   }
 
-  async push(remote?: string, branch?: string, options?: { force?: 'with-lease' | 'force'; setUpstream?: boolean }): Promise<string> {
+  async push(remote?: string, branch?: string, options?: { force?: 'with-lease' | 'force'; setUpstream?: boolean; remoteBranch?: string }): Promise<string> {
+    if (options?.remoteBranch !== undefined) {
+      this.assertSafeRef(remote!, 'push');
+      this.assertSafeRef(branch!, 'push');
+      this.assertSafeRef(options.remoteBranch, 'push');
+      if (!(await this.getRemoteNames()).includes(remote!)) throw new GitError('Unknown push remote', null, []);
+      await this.exec(['check-ref-format', `refs/heads/${branch}`]);
+      await this.exec(['check-ref-format', `refs/heads/${options.remoteBranch}`]);
+    }
     const args = ['push'];
     if (options?.force === 'force') {
       args.push('--force');
@@ -1453,7 +1461,9 @@ export class GitService {
       args.push(remote);
       if (branch) {
         // Use full refspec to avoid ambiguity when tag and branch names collide
-        args.push(`refs/heads/${branch}`);
+        args.push(options?.remoteBranch !== undefined
+          ? `refs/heads/${branch}:refs/heads/${options.remoteBranch}`
+          : `refs/heads/${branch}`);
       }
     }
     return this.execWithAuthRetry(args, remote);
@@ -1461,7 +1471,7 @@ export class GitService {
 
   /**
    * Pushes the current branch, used by "push after rebase/merge/…" follow-up
-   * actions. Mirrors the PushModal convention: when the branch has an upstream
+   * actions. When the branch has an upstream
    * we push with no remote/refspec (git resolves it from the upstream); when it
    * doesn't, we set upstream (-u) on the default remote (origin if present, else
    * the first remote). With no remotes configured the push is skipped.

@@ -192,6 +192,10 @@ A modern and full-featured Git visualization tool for an intuitive Git experienc
 | `gitGraphPlus.graphLaneSpacing`        | `13`          | Horizontal distance in pixels between graph lanes      |
 | `gitGraphPlus.graphColors`             | 12 colors     | Color palette auto-assigned to graph rails (hex strings) |
 
+The Push dialog lets you choose a remote and destination branch, or enter a new branch name.
+`gitGraphPlus.defaults.push.setUpstream` defaults to `true`: a successful push sets or replaces the
+branch’s upstream with that destination. Set it to `false` to leave tracking unchanged.
+
 ### Operation Defaults
 
 Preset the default options for each operation dialog under `gitGraphPlus.defaults.*` (configure in VS Code Settings):

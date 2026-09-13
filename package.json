@@ -612,7 +612,7 @@
         "gitGraphPlus.defaults.push.setUpstream": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Set the upstream tracking reference with `-u` when pushing."
+          "markdownDescription": "Set or replace the branch’s upstream with the selected destination after a successful push from the Push dialog (`-u`). Disable to leave upstream tracking unchanged."
         },
         "gitGraphPlus.defaults.push.allTags": {
           "type": "boolean",

@@ -28,8 +28,32 @@ describe('PushModal — payload composition', () => {
       forceMode: 'none',
       setUpstream: true,
       remote: 'origin',
+      remoteBranch: 'main',
       allTags: false,
     });
+  });
+
+  it('prefers the configured push remote and local branch name over a different upstream', async () => {
+    const onPush = vi.fn();
+    const { container } = render(PushModal, {
+      ...baseProps, upstream: 'origin/release', pushRemote: 'fork',
+      remotes: [{ name: 'origin' }, { name: 'fork' }], onPush,
+    });
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(onPush).toHaveBeenCalledWith(expect.objectContaining({ remote: 'fork', remoteBranch: 'main' }));
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.color-select-btn')!);
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.color-select-option')!);
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(onPush).toHaveBeenLastCalledWith(expect.objectContaining({ remote: 'origin', remoteBranch: 'release' }));
+  });
+
+  it('keeps the tracked destination when the push and upstream remotes match', async () => {
+    const onPush = vi.fn();
+    const { container } = render(PushModal, {
+      ...baseProps, upstream: 'origin/release', pushRemote: 'origin', onPush,
+    });
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(onPush).toHaveBeenCalledWith(expect.objectContaining({ remote: 'origin', remoteBranch: 'release' }));
   });
 
   it('toggling allTags propagates into the payload', async () => {
@@ -131,7 +155,7 @@ describe('PushModal — initializes from defaultsStore', () => {
 });
 
 describe('PushModal — setUpstream visibility', () => {
-  it('shows the "create tracking" checkbox only when hasUpstream=false', () => {
+  it('does not show a tracking checkbox with or without an upstream', () => {
     const withUpstream = render(PushModal, { ...baseProps, hasUpstream: true });
     const beforeLabels = Array.from(withUpstream.container.querySelectorAll('label.modal-checkbox'))
       .map(l => l.textContent ?? '');
@@ -141,6 +165,6 @@ describe('PushModal — setUpstream visibility', () => {
     const without = render(PushModal, { ...baseProps, hasUpstream: false });
     const labels = Array.from(without.container.querySelectorAll('label.modal-checkbox'))
       .map(l => l.textContent ?? '');
-    expect(labels.some(t => /tracking/i.test(t))).toBe(true);
+    expect(labels.some(t => /tracking/i.test(t))).toBe(false);
   });
 });

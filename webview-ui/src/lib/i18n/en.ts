@@ -31,6 +31,9 @@ export const en: Record<string, string> = {
   'push.to': 'To',
   'push.new': 'new ({target})',
   'push.createTracking': 'Create tracking reference',
+  'push.upstreamWillChange': 'After a successful push, upstream will change to {target}.',
+  'push.upstreamStays': 'Upstream stays {target}.',
+  'push.noUpstream': 'No upstream will be set.',
   'push.pushAllTags': 'Push all tags',
 
   // Sidebar sections

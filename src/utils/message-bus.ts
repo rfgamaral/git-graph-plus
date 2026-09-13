@@ -57,7 +57,7 @@ export type WebviewMessage =
   | { type: 'runClassicRebase'; payload: { base: string } }
   | { type: 'getRebaseCommits'; payload: { base: string } }
   | { type: 'reset'; payload: { ref: string; mode: 'soft' | 'mixed' | 'hard' } }
-  | { type: 'push'; payload: { remote?: string; branch?: string; force?: 'with-lease' | 'force'; setUpstream?: boolean } }
+  | { type: 'push'; payload: { remote?: string; branch?: string; remoteBranch?: string; force?: 'with-lease' | 'force'; setUpstream?: boolean } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean; stash?: boolean } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean } }
   | { type: 'stashSave'; payload: { message?: string; includeUntracked?: boolean; keepIndex?: boolean } }

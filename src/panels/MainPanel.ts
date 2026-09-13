@@ -946,7 +946,7 @@ export class MainPanel {
           break;
         }
         case 'push': {
-          await this.gitService.push(message.payload.remote, message.payload.branch, { force: message.payload.force, setUpstream: message.payload.setUpstream });
+          await this.gitService.push(message.payload.remote, message.payload.branch, { force: message.payload.force, setUpstream: message.payload.setUpstream, remoteBranch: message.payload.remoteBranch });
           this.post({
             type: 'operationComplete',
             payload: { operation: 'push', success: true },
