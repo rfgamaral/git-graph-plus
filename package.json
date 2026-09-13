@@ -594,7 +594,14 @@
         "gitGraphPlus.dateTimeFormat": {
           "type": "string",
           "default": "R HH:mm:ss",
-          "markdownDescription": "Format for commit timestamps. Tokens: `YYYY` year, `MM` month, `DD` day, `HH` hour (24h), `hh` hour (12h), `mm` minute, `ss` second, `A` AM/PM, `R` today/yesterday word (localized) or numeric `DD.MM.YYYY`. Any other characters pass through. Examples: `DD.MM.YYYY HH:mm` → `03.09.2026 14:30`; `R HH:mm:ss` → `today 14:30:45`."
+          "markdownDescription": "Format for commit timestamps. Tokens: `YYYY` year, `MMM` abbreviated month (Jan-Dec), `MM` month number, `DD` padded day, `D` unpadded day, `HH` hour (24h), `hh` hour (12h), `mm` minute, `ss` second, `A` AM/PM, `R` today/yesterday word (localized) or the date formatted with `gitGraphPlus.relativeDateFallbackFormat`. Any other characters pass through. Examples: `DD.MM.YYYY HH:mm` → `03.09.2026 14:30`; `R HH:mm:ss` → `today 14:30:45`."
+        },
+        "gitGraphPlus.relativeDateFallbackFormat": {
+          "type": "string",
+          "default": "DD.MM.YYYY",
+          "minLength": 1,
+          "pattern": "^[^R]*$",
+          "markdownDescription": "Date format used by `R` in `gitGraphPlus.dateTimeFormat` for dates other than today or yesterday. Supports the same tokens except `R`. Use `D MMM YYYY` with `R HH:mm` to show `11 Sep 2026 05:29` for older dates while keeping today/yesterday."
         },
         "gitGraphPlus.defaults.push.force": {
           "type": "string",

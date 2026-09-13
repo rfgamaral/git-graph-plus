@@ -154,10 +154,46 @@ const commit = (hash: string) => ({
 });
 
 describe('MainPanel construction', () => {
-  it('creates a webview panel, sets its html, and posts the locale', () => {
+  it('creates a webview panel and sends settings only when requested', async () => {
     expect(H.panel).not.toBeNull();
     expect(H.panel!.webview).toBeDefined();
-    expect(postedOfType('setLocale').length).toBeGreaterThan(0);
+    expect(postedOfType('setLocale')).toHaveLength(0);
+    await dispatch({ type: 'getSettings' });
+    expect(postedOfType('setLocale')).toHaveLength(1);
+  });
+});
+
+describe('MainPanel startup settings', () => {
+  it('delivers configured dates and the other initial settings after the request', async () => {
+    H.config['dateTimeFormat'] = 'R HH:mm:ss';
+    H.config['relativeDateFallbackFormat'] = 'D MMM YYYY';
+    expect(postedOfType('setDateTimeFormat')).toHaveLength(0);
+    await dispatch({ type: 'getSettings' });
+    expect(postedOfType('setDateTimeFormat')).toEqual([{
+      type: 'setDateTimeFormat',
+      payload: { format: 'R HH:mm:ss', relativeDateFallbackFormat: 'D MMM YYYY' },
+    }]);
+    expect(posted().map(m => m.type)).toEqual(expect.arrayContaining([
+      'setLocale', 'setDefaults', 'setBadgeBarThickness', 'setGraphColors',
+      'setGraphLaneSpacing', 'setLoadMoreCount', 'setInteractiveRebaseMode',
+      'setAlwaysShowCommitDetails', 'setCommitDetailsPosition', 'setDefaultCommitTab',
+      'setCommitLinkRules',
+    ]));
+  });
+
+  it('reads current dates on another request and retains live updates', async () => {
+    await dispatch({ type: 'getSettings' });
+    H.config['dateTimeFormat'] = 'R HH:mm';
+    H.config['relativeDateFallbackFormat'] = 'D MMM YYYY';
+    await dispatch({ type: 'getSettings' });
+    expect(postedOfType('setDateTimeFormat').at(-1)?.payload).toEqual({
+      format: 'R HH:mm', relativeDateFallbackFormat: 'D MMM YYYY',
+    });
+    H.config['relativeDateFallbackFormat'] = 'YYYY-MM-DD';
+    H.configHandler!({ affectsConfiguration: key => key === 'gitGraphPlus.relativeDateFallbackFormat' });
+    expect(postedOfType('setDateTimeFormat').at(-1)?.payload).toEqual({
+      format: 'R HH:mm', relativeDateFallbackFormat: 'YYYY-MM-DD',
+    });
   });
 });
 
@@ -176,6 +212,8 @@ describe('MainPanel native restoration', () => {
     vi.mocked(GitService).mockClear();
     MainPanel.onRepoChange = vi.fn();
 
+    H.config['dateTimeFormat'] = 'R HH:mm:ss';
+    H.config['relativeDateFallbackFormat'] = 'D MMM YYYY';
     MainPanel.revive(panel, extUri, '/saved/repo');
 
     expect(window.createWebviewPanel).not.toHaveBeenCalled();
@@ -185,7 +223,12 @@ describe('MainPanel native restoration', () => {
     expect(panel.webview.options).toEqual({ enableScripts: true, localResourceRoots: [{}, {}] });
     expect(panel.iconPath).toEqual({ light: {}, dark: {} });
     expect(panel.webview.html).not.toBe('');
+    expect(postedOfType('setLocale')).toHaveLength(0);
+    await dispatch({ type: 'getSettings' });
     expect(panel.webview.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'setLocale' }));
+    expect(postedOfType('setDateTimeFormat').at(-1)?.payload).toEqual({
+      format: 'R HH:mm:ss', relativeDateFallbackFormat: 'D MMM YYYY',
+    });
     expect(panel.dispose).not.toHaveBeenCalled();
 
     await dispatch({ type: 'getLog', payload: {} });
@@ -216,7 +259,8 @@ describe('MainPanel native restoration', () => {
 });
 
 describe('MainPanel commit details settings', () => {
-  it('posts bottom position and disabled always-visible mode by default', () => {
+  it('posts bottom position and disabled always-visible mode by default', async () => {
+    await dispatch({ type: 'getSettings' });
     expect(postedOfType('setCommitDetailsPosition').at(-1)?.payload).toEqual({ position: 'bottom' });
     expect(postedOfType('setAlwaysShowCommitDetails').at(-1)?.payload).toEqual({ enabled: false });
   });

@@ -27,6 +27,7 @@ export interface ModalDefaults {
 
 // Messages from Webview → Extension
 export type WebviewMessage =
+  | { type: 'getSettings' }
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
   | { type: 'getDiffMode' }
   | { type: 'saveDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
@@ -170,7 +171,7 @@ export type ExtensionMessage =
   | { type: 'setInteractiveRebaseMode'; payload: { mode: 'ui' | 'classic' } }
   | { type: 'setDefaultCommitTab'; payload: { tab: 'details' | 'changes' } }
   | { type: 'setDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
-  | { type: 'setDateTimeFormat'; payload: { format: string } }
+  | { type: 'setDateTimeFormat'; payload: { format: string; relativeDateFallbackFormat: string } }
   | { type: 'setDefaults'; payload: ModalDefaults }
   | { type: 'setLoadMoreCount'; payload: { count: number } }
   | { type: 'setBadgeBarThickness'; payload: { width: number } }

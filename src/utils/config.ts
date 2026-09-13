@@ -115,3 +115,8 @@ export function readAuthorColors(): Record<string, string> {
 export function readCommitDetailsPosition(): 'bottom' | 'right' {
   return vscode.workspace.getConfiguration('gitGraphPlus').get<string>('commitDetailsPosition', 'bottom') === 'right' ? 'right' : 'bottom';
 }
+
+export function readRelativeDateFallbackFormat(): string {
+  const raw = vscode.workspace.getConfiguration('gitGraphPlus').get<unknown>('relativeDateFallbackFormat');
+  return typeof raw === 'string' && raw.trim() && !raw.includes('R') ? raw : 'DD.MM.YYYY';
+}

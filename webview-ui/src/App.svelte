@@ -264,6 +264,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
           break;
         case 'setDateTimeFormat':
           uiStore.dateTimeFormat = msg.payload.format;
+          uiStore.relativeDateFallbackFormat = msg.payload.relativeDateFallbackFormat ?? 'DD.MM.YYYY';
           break;
         case 'authorColors':
           authorColorsStore.colors = msg.payload.colors;
@@ -385,6 +386,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
     }
 
     window.addEventListener('message', handleMessage);
+    vscode.postMessage({ type: 'getSettings' });
 
     // Request initial data
     commitStore.setLoading(true);

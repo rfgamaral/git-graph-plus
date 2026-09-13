@@ -17,7 +17,7 @@
   let cardEl: HTMLDivElement | undefined = $state();
 
   function formatFullDate(dateStr: string): string {
-    return formatDateTime(dateStr, uiStore.dateTimeFormat);
+    return formatDateTime(dateStr, uiStore.dateTimeFormat, uiStore.relativeDateFallbackFormat);
   }
 
   // Keep within viewport

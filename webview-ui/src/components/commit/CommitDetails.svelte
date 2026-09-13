@@ -435,7 +435,7 @@
   });
 
   function formatFullDate(dateStr: string): string {
-    return formatDateTime(dateStr, uiStore.dateTimeFormat);
+    return formatDateTime(dateStr, uiStore.dateTimeFormat, uiStore.relativeDateFallbackFormat);
   }
 
   function handleParentMouseEnter(e: MouseEvent, hash: string) {

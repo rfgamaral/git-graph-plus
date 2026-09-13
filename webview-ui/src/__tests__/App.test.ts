@@ -59,10 +59,44 @@ describe('App — initial requests', () => {
     render(App);
     await waitFor(() => {
       const types = globalThis.__postedMessages.map(m => (m.data as { type?: string }).type);
+      expect(types).toContain('getSettings');
+      expect(types.indexOf('getSettings')).toBeLessThan(types.indexOf('getLog'));
       expect(types).toContain('getLog');
       expect(types).toContain('getBranches');
       expect(types).toContain('checkFlowStatus');
     });
+  });
+});
+
+describe('App — startup settings delivery', () => {
+  it('receives immediate settings replies on the initial mount and remount', async () => {
+    const api = getVsCodeApi();
+    const post = api.postMessage.bind(api);
+    const format = uiStore.dateTimeFormat;
+    const fallback = uiStore.relativeDateFallbackFormat;
+    const spy = vi.spyOn(api, 'postMessage').mockImplementation(message => {
+      post(message);
+      if ((message as { type: string }).type === 'getSettings') {
+        postMsg('setDateTimeFormat', { format: 'R HH:mm:ss', relativeDateFallbackFormat: 'D MMM YYYY' });
+      }
+    });
+    try {
+      for (let mount = 0; mount < 2; mount++) {
+        uiStore.dateTimeFormat = 'DD.MM.YYYY HH:mm:ss';
+        uiStore.relativeDateFallbackFormat = 'DD.MM.YYYY';
+        const app = render(App);
+        await waitFor(() => {
+          expect(uiStore.dateTimeFormat).toBe('R HH:mm:ss');
+          expect(uiStore.relativeDateFallbackFormat).toBe('D MMM YYYY');
+        });
+        await app.unmount();
+      }
+      expect(spy.mock.calls.filter(([message]) => (message as { type: string }).type === 'getSettings')).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+      uiStore.dateTimeFormat = format;
+      uiStore.relativeDateFallbackFormat = fallback;
+    }
   });
 });
 

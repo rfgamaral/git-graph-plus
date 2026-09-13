@@ -399,6 +399,7 @@
     if (commitStore.loading || !container) return;
     displayCommits;
     uiStore.dateTimeFormat;
+    uiStore.relativeDateFallbackFormat;
     fittedWidths = untrack(measureColumnWidths);
   });
 
@@ -1255,7 +1256,7 @@
   }
 
   function formatDate(dateStr: string): string {
-    return formatDateTime(dateStr, uiStore.dateTimeFormat);
+    return formatDateTime(dateStr, uiStore.dateTimeFormat, uiStore.relativeDateFallbackFormat);
   }
 
   // Keep the viewport size in sync with the actual container. Its height changes

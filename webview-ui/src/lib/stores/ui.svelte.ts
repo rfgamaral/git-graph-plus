@@ -31,6 +31,7 @@ class UiStore {
   defaultCommitTab = $state<'details' | 'changes'>('details');
   diffMode = $state<'inline' | 'side-by-side'>('inline');
   dateTimeFormat = $state('DD.MM.YYYY HH:mm:ss');
+  relativeDateFallbackFormat = $state('DD.MM.YYYY');
   // Drives a "focus this commit in the graph" request (e.g. clicking a parent
   // link in the details panel). Nonce so repeated focus of the same hash
   // re-scrolls; hash tells the graph which row to centre on.

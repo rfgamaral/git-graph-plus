@@ -5,7 +5,7 @@ import { GitService, GitError } from '../git/git-service';
 import { formatGitError, isAuthFailure, transportFromRemoteUrl } from '../git/git-error-formatter';
 import { splitUpstreamRef } from '../git/git-parser';
 import { samePath } from '../utils/path';
-import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readGraphLaneSpacing, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readCommitDetailsPosition, readAuthorColors } from '../utils/config';
+import { readTimeoutMs, readInitialCommitCount, readLoadMoreCommitCount, readGraphLaneSpacing, readInteractiveRebaseMode, readAvatarOverrides, readFetchLfsLocks, readDefaultCommitTab, readDateTimeFormat, readRelativeDateFallbackFormat, readCommitDetailsPosition, readAuthorColors } from '../utils/config';
 import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
@@ -233,8 +233,8 @@ export class MainPanel {
         if (e.affectsConfiguration('gitGraphPlus.defaultCommitTab')) {
           this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
         }
-        if (e.affectsConfiguration('gitGraphPlus.dateTimeFormat')) {
-          this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
+        if (e.affectsConfiguration('gitGraphPlus.dateTimeFormat') || e.affectsConfiguration('gitGraphPlus.relativeDateFallbackFormat')) {
+          this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat(), relativeDateFallbackFormat: readRelativeDateFallbackFormat() } });
         }
         if (e.affectsConfiguration('gitGraphPlus.defaults')) {
           this.post({ type: 'setDefaults', payload: this.readModalDefaults() });
@@ -282,23 +282,6 @@ export class MainPanel {
     };
 
     this.panel.webview.html = this.getHtmlForWebview(this.panel.webview);
-
-    // Send locale to webview
-    const localeSetting = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('locale', 'auto');
-    const locale = localeSetting === 'auto' ? (vscode.env.language || 'en') : localeSetting;
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    this.post({ type: 'setLocale', payload: { locale, homeDir } });
-    this.post({ type: 'setDefaults', payload: this.readModalDefaults() });
-    this.post({ type: 'setBadgeBarThickness', payload: { width: this.readBadgeBarWidth() } });
-    this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
-    this.post({ type: 'setGraphLaneSpacing', payload: { spacing: readGraphLaneSpacing() } });
-    this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
-    this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
-    this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });
-    this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
-    this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
-    this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat() } });
-    void this.postCommitLinkRules();
 
     this.panel.webview.onDidReceiveMessage(
       (message: WebviewMessage) => this.handleMessage(message),
@@ -462,6 +445,24 @@ export class MainPanel {
     let logRequestSequence: number | undefined;
     try {
       switch (message.type) {
+        case 'getSettings': {
+          const localeSetting = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('locale', 'auto');
+          const locale = localeSetting === 'auto' ? (vscode.env.language || 'en') : localeSetting;
+          const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+          this.post({ type: 'setLocale', payload: { locale, homeDir } });
+          this.post({ type: 'setDefaults', payload: this.readModalDefaults() });
+          this.post({ type: 'setBadgeBarThickness', payload: { width: this.readBadgeBarWidth() } });
+          this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
+          this.post({ type: 'setGraphLaneSpacing', payload: { spacing: readGraphLaneSpacing() } });
+          this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
+          this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
+          this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });
+          this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
+          this.post({ type: 'setDefaultCommitTab', payload: { tab: readDefaultCommitTab() } });
+          this.post({ type: 'setDateTimeFormat', payload: { format: readDateTimeFormat(), relativeDateFallbackFormat: readRelativeDateFallbackFormat() } });
+          void this.postCommitLinkRules();
+          break;
+        }
         case 'setCommitDetailsPosition': {
           const { position } = message.payload;
           if (position !== 'bottom' && position !== 'right') break;
