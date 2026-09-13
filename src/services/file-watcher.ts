@@ -25,6 +25,7 @@ export class FileWatcher implements vscode.Disposable {
     //   HEAD, index, MERGE_HEAD, REBASE_HEAD live in the per-worktree gitdir
     //   for linked worktrees, and in `.git` for regular repos (gitDir==commonDir).
     this.addWatcher(new vscode.RelativePattern(this.gitDir, 'HEAD'));
+    this.addWatcher(new vscode.RelativePattern(this.gitDir, 'logs/HEAD'));
     this.addWatcher(new vscode.RelativePattern(this.gitDir, 'index'));
     this.addWatcher(new vscode.RelativePattern(this.gitDir, 'MERGE_HEAD'));
     this.addWatcher(new vscode.RelativePattern(this.gitDir, 'REBASE_HEAD'));
@@ -33,6 +34,8 @@ export class FileWatcher implements vscode.Disposable {
     //   refs/, packed-refs, config, worktrees/ are shared across all worktrees
     //   so we watch them at the main gitdir.
     this.addWatcher(new vscode.RelativePattern(this.commonDir, 'refs/**'));
+    this.addWatcher(new vscode.RelativePattern(this.commonDir, 'logs/refs/**'));
+    this.addWatcher(new vscode.RelativePattern(this.commonDir, 'worktrees/*/logs/HEAD'));
     this.addWatcher(new vscode.RelativePattern(this.commonDir, 'refs/stash'));
     this.addWatcher(new vscode.RelativePattern(this.commonDir, 'packed-refs'));
     this.addWatcher(new vscode.RelativePattern(this.commonDir, 'config'));

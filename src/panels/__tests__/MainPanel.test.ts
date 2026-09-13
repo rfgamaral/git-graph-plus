@@ -640,6 +640,149 @@ describe('MainPanel log filters', () => {
   });
 });
 
+describe('MainPanel graph view options', () => {
+  let values: Map<string, unknown>;
+  let update: ReturnType<typeof vi.fn>;
+  const defaults = { showTagLabels: true, showStashEntries: true, showLostCommits: false };
+
+  beforeEach(() => {
+    values = new Map();
+    update = vi.fn(async (key: string, value: unknown) => {
+      if (value === undefined) values.delete(key);
+      else values.set(key, value);
+    });
+    MainPanel.setGlobalState({
+      keys: () => [...values.keys()],
+      get: <T>(key: string, fallback?: T) => values.has(key) ? values.get(key) as T : fallback,
+      update,
+    } as import('vscode').Memento);
+  });
+
+  afterEach(() => values.clear());
+
+  it.each([
+    { saved: undefined, expected: defaults },
+    { saved: { showTagLabels: false, showStashEntries: false }, expected: { ...defaults, showTagLabels: false, showStashEntries: false } },
+    { saved: { showLostCommits: 'true' }, expected: defaults },
+  ])('defaults lost commits to false while restoring existing preferences %#', async ({ saved, expected }) => {
+    values.set('graphViewOptions:/repo', saved);
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    MainPanel.createOrShow(extUri, '/repo');
+    await dispatch({ type: 'getRepoList' });
+    await dispatch({ type: 'getLog', payload: {} });
+
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(expected);
+    expect(H.git.log).toHaveBeenLastCalledWith(expect.objectContaining({
+      showStashEntries: expected.showStashEntries, showLostCommits: false,
+    }));
+  });
+
+  it('persists and restores lost commits independently for each repository and after reopening', async () => {
+    const enabled = { ...defaults, showLostCommits: true };
+    H.repos.push({ path: '/repo-b', name: 'repo-b', type: 'root' });
+    await dispatch({ type: 'getRepoList' });
+    await dispatch({ type: 'saveGraphViewOptions', payload: { repo: '/repo', ...enabled } });
+    expect(values.get('graphViewOptions:/repo')).toEqual(enabled);
+
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo-b' } });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(defaults);
+    expect(H.git.log).toHaveBeenLastCalledWith(expect.objectContaining({ showLostCommits: false }));
+    await dispatch({ type: 'saveGraphViewOptions', payload: { repo: '/repo-b', ...defaults } });
+    expect(values.get('graphViewOptions:/repo-b')).toEqual(defaults);
+
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo' } });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(enabled);
+    expect(H.git.log).toHaveBeenLastCalledWith(expect.objectContaining({ showLostCommits: true }));
+    expect(values.get('graphViewOptions:/repo-b')).toEqual(defaults);
+
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    values = new Map(JSON.parse(JSON.stringify([...values])));
+    MainPanel.createOrShow(extUri, '/repo');
+    await dispatch({ type: 'getRepoList' });
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(enabled);
+    expect(H.git.log).toHaveBeenLastCalledWith(expect.objectContaining({ showLostCommits: true }));
+  });
+
+  it('reloads the current limit when lost commits change, but not when saving unchanged options', async () => {
+    await dispatch({ type: 'getLog', payload: { limit: 500 } });
+    for (const showLostCommits of [true, false]) {
+      H.git.log.mockClear();
+      H.panel!.webview.postMessage.mockClear();
+      const payload = { repo: '/repo', ...defaults, showLostCommits };
+      await dispatch({ type: 'saveGraphViewOptions', payload });
+      expect(H.git.log).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ limit: 501, showLostCommits }));
+      expect(postedOfType('logData')).toHaveLength(1);
+      expect(postedOfType('logData')[0].payload?.currentLimit).toBe(500);
+
+      await dispatch({ type: 'saveGraphViewOptions', payload });
+      expect(H.git.log).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it.each(['status', 'full'] as const)('passes the saved lost commits option through a %s refresh', async (scope) => {
+    await dispatch({ type: 'saveGraphViewOptions', payload: { repo: '/repo', ...defaults, showLostCommits: true } });
+    H.git.log.mockClear();
+    H.panel!.webview.postMessage.mockClear();
+
+    await (MainPanel.currentPanel as unknown as { refreshAll(scope: 'status' | 'full'): Promise<void> }).refreshAll(scope);
+
+    expect(H.git.log).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ showLostCommits: true }));
+    expect(postedOfType(scope === 'status' ? 'logData' : 'fullRefresh')).toHaveLength(1);
+  });
+
+  it.each([
+    { repo: '/repo', ...defaults, showLostCommits: undefined },
+    { repo: '/repo', ...defaults, showLostCommits: 'true' },
+    { repo: '/repo', ...defaults, showLostCommits: 1 },
+    { repo: '/repo', ...defaults, showLostCommits: null },
+    { repo: '/repo', ...defaults, showTagLabels: undefined, showLostCommits: true },
+    { repo: '/repo', ...defaults, showStashEntries: 'true', showLostCommits: true },
+    { repo: 42, ...defaults, showLostCommits: true },
+    { ...defaults, showLostCommits: true },
+  ])('rejects invalid graph view option saves %#', async (payload) => {
+    await dispatch({ type: 'saveGraphViewOptions', payload });
+    expect(update).not.toHaveBeenCalled();
+    expect(H.git.log).not.toHaveBeenCalled();
+    await dispatch({ type: 'getRepoList' });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(defaults);
+  });
+
+  it('does not reload the previous repository when its pending save finishes after switching', async () => {
+    H.repos.push({ path: '/repo-b', name: 'repo-b', type: 'root' });
+    await dispatch({ type: 'getRepoList' });
+    let finishSave!: () => void;
+    update.mockImplementationOnce(() => new Promise<void>(resolve => { finishSave = resolve; }));
+    const save = dispatch({ type: 'saveGraphViewOptions', payload: { repo: '/repo', ...defaults, showLostCommits: true } });
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo-b' } });
+    H.git.log.mockClear();
+    H.panel!.webview.postMessage.mockClear();
+
+    finishSave();
+    await save;
+
+    expect(H.git.log).not.toHaveBeenCalled();
+    expect(postedOfType('logData')).toHaveLength(0);
+    await dispatch({ type: 'getRepoList' });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(defaults);
+  });
+
+  it('rejects a save from the previous repository without changing the active options', async () => {
+    H.repos.push({ path: '/repo-b', name: 'repo-b', type: 'root' });
+    await dispatch({ type: 'getRepoList' });
+    await dispatch({ type: 'switchRepo', payload: { path: '/repo-b' } });
+    update.mockClear();
+    H.git.log.mockClear();
+
+    await dispatch({ type: 'saveGraphViewOptions', payload: { repo: '/repo', ...defaults, showLostCommits: true } });
+
+    expect(update).not.toHaveBeenCalled();
+    expect(H.git.log).not.toHaveBeenCalled();
+    await dispatch({ type: 'getRepoList' });
+    expect(postedOfType('repoList').at(-1)?.payload?.viewOptions).toEqual(defaults);
+  });
+});
+
 describe('MainPanel author colors', () => {
   it('persists normalized author emails and reloads their colors in another repository', async () => {
     await dispatch({ type: 'saveAuthorColor', payload: { email: ' Alice@Example.COM ', color: '#61afef' } });

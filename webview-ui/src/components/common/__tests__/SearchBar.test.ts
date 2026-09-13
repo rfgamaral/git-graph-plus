@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/svelte';
+import { render, fireEvent, cleanup, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { getVsCodeApi } from '../../../lib/vscode-api';
 import { uiStore } from '../../../lib/stores/ui.svelte';
@@ -406,6 +406,38 @@ describe('SearchBar — View menu', () => {
     expect(onRefresh).toHaveBeenCalled();
     expect(uiStore.operating).toBe('refresh');
     uiStore.operating = null;
+  });
+
+  it.each([false, true])('toggles lost commits from %s and saves the repository preference', async (shown) => {
+    const previous = { repo: uiStore.activeRepo, options: uiStore.graphViewOptions, loading: commitStore.loading, operating: uiStore.operating };
+    uiStore.activeRepo = '/repo';
+    uiStore.graphViewOptions = { showTagLabels: true, showStashEntries: true, showLostCommits: shown };
+    uiStore.operating = null;
+    commitStore.loading = false;
+    try {
+      const { container } = render(SearchBar, baseProps);
+      const { getByRole } = within(container);
+      await fireEvent.click(getByRole('button', { name: 'View' }));
+      expect(Array.from(container.querySelectorAll('[role="menuitemcheckbox"], [role="menuitem"]')).map(el => el.textContent?.trim())).toEqual([
+        'Show tag labels', 'Show stash entries', 'Show lost commits (reflog)', 'Refresh',
+      ]);
+      const option = getByRole('menuitemcheckbox', { name: 'Show lost commits (reflog)' });
+      expect(option.getAttribute('aria-checked')).toBe(String(shown));
+      await fireEvent.click(option);
+      expect(uiStore.graphViewOptions.showLostCommits).toBe(!shown);
+      expect(commitStore.loading).toBe(true);
+      expect(globalThis.__postedMessages.at(-1)?.data).toEqual({
+        type: 'saveGraphViewOptions',
+        payload: { repo: '/repo', showTagLabels: true, showStashEntries: true, showLostCommits: !shown },
+      });
+      expect(container.querySelector('[role="menu"]')).toBeNull();
+    } finally {
+      cleanup();
+      uiStore.activeRepo = previous.repo;
+      uiStore.graphViewOptions = previous.options;
+      uiStore.operating = previous.operating;
+      commitStore.loading = previous.loading;
+    }
   });
 
 });

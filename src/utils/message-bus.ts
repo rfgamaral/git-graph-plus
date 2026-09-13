@@ -3,6 +3,7 @@ import type { CommitGraphData, BranchData, DiffData, Commit, WorktreeInfo, Commi
 export interface GraphViewOptions {
   showTagLabels: boolean;
   showStashEntries: boolean;
+  showLostCommits: boolean;
 }
 
 export interface LinkRule {

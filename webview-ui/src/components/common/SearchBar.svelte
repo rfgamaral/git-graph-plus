@@ -51,9 +51,9 @@
   let branchQuery = $state('');
   let viewMenu = $state<{ x: number; y: number } | null>(null);
 
-  function toggleViewOption(option: 'showTagLabels' | 'showStashEntries') {
+  function toggleViewOption(option: 'showTagLabels' | 'showStashEntries' | 'showLostCommits') {
     uiStore.graphViewOptions = { ...uiStore.graphViewOptions, [option]: !uiStore.graphViewOptions[option] };
-    if (option === 'showStashEntries') commitStore.setLoading(true);
+    if (option !== 'showTagLabels') commitStore.setLoading(true);
     getVsCodeApi().postMessage({ type: 'saveGraphViewOptions', payload: { repo: uiStore.activeRepo, ...uiStore.graphViewOptions } });
   }
 
@@ -431,6 +431,7 @@
       items={[
         { label: t('toolbar.showTagLabels'), checked: uiStore.graphViewOptions.showTagLabels, action: () => toggleViewOption('showTagLabels'), disabled: !uiStore.activeRepo },
         { label: t('toolbar.showStashEntries'), checked: uiStore.graphViewOptions.showStashEntries, action: () => toggleViewOption('showStashEntries'), disabled: !uiStore.activeRepo || commitStore.loading || uiStore.operating !== null },
+        { label: t('toolbar.showLostCommits'), checked: uiStore.graphViewOptions.showLostCommits, action: () => toggleViewOption('showLostCommits'), disabled: !uiStore.activeRepo || commitStore.loading || uiStore.operating !== null },
         { label: '', separator: true, action: () => {} },
         { label: t('toolbar.refresh'), icon: 'refresh', action: refresh, disabled: uiStore.operating !== null },
       ]}

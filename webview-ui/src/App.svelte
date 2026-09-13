@@ -297,6 +297,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
           uiStore.graphViewOptions = {
             showTagLabels: msg.payload.viewOptions?.showTagLabels !== false,
             showStashEntries: msg.payload.viewOptions?.showStashEntries !== false,
+            showLostCommits: msg.payload.viewOptions?.showLostCommits === true,
           };
           saveRepoPath(msg.payload.active);
           commitStore.notGitRepo = false;

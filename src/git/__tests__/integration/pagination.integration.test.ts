@@ -166,4 +166,48 @@ describe('GitService integration: cached pagination', () => {
     expect(paginated.find(c => c.hash === hashes[4])?.parents).toEqual([hashes[3]]);
     expect(paginated[3].parents).toEqual([]);
   });
+
+  it.each([false, true])('includes lost ancestry without duplicating stashes (show stashes: %s)', async (showStashEntries) => {
+    const base = commit(repo.path, 'base', { 'a.txt': 'base\n' });
+    const lostParent = commit(repo.path, 'lost parent');
+    const lostTip = commit(repo.path, 'lost tip');
+    runGit(repo.path, ['reset', '--hard', base]);
+    const tip = commit(repo.path, 'main tip');
+    writeFile(repo.path, 'a.txt', 'stashed\n');
+    runGit(repo.path, ['stash', 'push', '-m', 'saved work']);
+    const stash = runGit(repo.path, ['rev-parse', 'refs/stash']).trim();
+    const options = { showStashEntries, sortOrder: 'topological' as const, branches: ['main'] };
+    const ordinary = await svc.log(options);
+    expect(ordinary.map(c => c.hash)).not.toContain(lostTip);
+    expect(ordinary.map(c => c.hash)).not.toContain(lostParent);
+
+    await svc.log({ ...options, showLostCommits: true, limit: 2, loadMore: false });
+    const paginated = await svc.log({ ...options, showLostCommits: true, limit: 10, loadMore: true });
+    expect(paginated).toEqual(await new GitService(repo.path).log({ ...options, showLostCommits: true, limit: 10 }));
+    expect(paginated.map(c => c.hash)).toEqual(expect.arrayContaining([base, tip, lostParent, lostTip]));
+    expect(paginated.filter(c => c.hash === stash)).toHaveLength(showStashEntries ? 1 : 0);
+    expect(paginated).toHaveLength(showStashEntries ? 5 : 4);
+    expect(new Set(paginated.map(c => c.hash)).size).toBe(paginated.length);
+    expect(await svc.stashList()).toHaveLength(1);
+    expect(await svc.log({ ...options, showLostCommits: false, limit: 10, loadMore: true })).toEqual(ordinary);
+  });
+
+  it('invalidates lost history after reflog expiry without moving refs', async () => {
+    const base = commit(repo.path, 'base');
+    const lost = commit(repo.path, 'lost');
+    runGit(repo.path, ['reset', '--hard', base]);
+    const tip = commit(repo.path, 'main tip');
+    const options = { showLostCommits: true, showStashEntries: false, sortOrder: 'topological' as const };
+    const first = await svc.log({ ...options, limit: 3, loadMore: false });
+    expect(first.map(c => c.hash)).toContain(lost);
+    const refs = runGit(repo.path, ['show-ref']);
+    const head = runGit(repo.path, ['rev-parse', 'HEAD']);
+    runGit(repo.path, ['reflog', 'expire', '--expire=now', '--all']);
+    expect(runGit(repo.path, ['show-ref'])).toBe(refs);
+    expect(runGit(repo.path, ['rev-parse', 'HEAD'])).toBe(head);
+
+    const paginated = await svc.log({ ...options, limit: 10, loadMore: true });
+    expect(paginated).toEqual(await new GitService(repo.path).log({ ...options, limit: 10 }));
+    expect(paginated.map(c => c.hash)).toEqual([tip, base]);
+  });
 });

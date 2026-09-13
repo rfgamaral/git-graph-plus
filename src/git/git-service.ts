@@ -492,6 +492,8 @@ export class GitService {
     const seq = ++this.logSequence;
     const cacheEnabled = options?.loadMore !== undefined && !options.skip && !!options.limit;
     const snapshot = cacheEnabled ? await this.logSnapshot() : undefined;
+    const lostCommitArgs = ['rev-list', '--reflog', '--not', '--all', 'HEAD'];
+    const lostCommits = options?.showLostCommits ? await this.exec(lostCommitArgs) : '';
     // %G? is appended after %b only when signature verification is requested,
     // since it forces GPG verification of every commit in the log (slow on
     // large repos). %b never contains a NUL so the trailing column is unambiguous.
@@ -563,7 +565,8 @@ export class GitService {
       }
     }
 
-    const cacheKey = JSON.stringify([args, snapshot]);
+    if (options?.showLostCommits) args.push('--stdin');
+    const cacheKey = JSON.stringify([args, snapshot, lostCommits]);
     const cached = cacheEnabled && options?.loadMore && this.logCache?.key === cacheKey
       ? this.logCache.commits.slice(0, options.limit)
       : [];
@@ -573,12 +576,13 @@ export class GitService {
     if (skip) args.push(`--skip=${skip}`);
 
     const [raw, remoteNames] = await Promise.all([
-      remaining === 0 ? Promise.resolve('') : this.exec(args),
+      remaining === 0 ? Promise.resolve('') : this.exec(args, options?.showLostCommits ? { stdin: lostCommits + '\n' } : undefined),
       this.getRemoteNames(),
     ]);
     const history = cached.concat(parseLog(raw, remoteNames));
     if (cacheEnabled) {
-      const unchanged = snapshot === await this.logSnapshot();
+      const unchanged = snapshot === await this.logSnapshot()
+        && (!options?.showLostCommits || lostCommits === await this.exec(lostCommitArgs));
       if (!unchanged && cached.length > 0) return this.log({ ...options, loadMore: false });
       if (seq === this.logSequence) {
         this.logCache = unchanged ? { key: cacheKey, commits: history } : undefined;

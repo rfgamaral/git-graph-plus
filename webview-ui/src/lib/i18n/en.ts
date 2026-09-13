@@ -10,6 +10,7 @@ export const en: Record<string, string> = {
   'toolbar.view': 'View',
   'toolbar.showTagLabels': 'Show tag labels',
   'toolbar.showStashEntries': 'Show stash entries',
+  'toolbar.showLostCommits': 'Show lost commits (reflog)',
   'toolbar.stashDesc': 'Stash (save uncommitted changes)',
   'toolbar.fetchAll': 'Fetch All (download remote changes)',
   'toolbar.pullDesc': 'Pull (Fetch + Merge)',

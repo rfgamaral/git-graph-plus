@@ -49,7 +49,7 @@ export class MainPanel {
   private disposables: vscode.Disposable[] = [];
   private allConflictFiles: string[] = [];
   private currentLimit = 1000;
-  private graphViewOptions: GraphViewOptions = { showTagLabels: true, showStashEntries: true };
+  private graphViewOptions: GraphViewOptions = { showTagLabels: true, showStashEntries: true, showLostCommits: false };
   private currentRemoteFilter: string[] | undefined = undefined;
   private currentBranchFilter: string[] | undefined = undefined;
   private pendingFilterRestore: Promise<void> | undefined;
@@ -502,11 +502,12 @@ export class MainPanel {
           break;
         }
         case 'saveGraphViewOptions': {
-          const { repo, showTagLabels, showStashEntries } = message.payload;
+          const { repo, showTagLabels, showStashEntries, showLostCommits } = message.payload;
           if (typeof repo !== 'string' || !samePath(repo, this.repoPath)
-            || typeof showTagLabels !== 'boolean' || typeof showStashEntries !== 'boolean') break;
-          const reload = showStashEntries !== this.graphViewOptions.showStashEntries;
-          this.graphViewOptions = { showTagLabels, showStashEntries };
+            || typeof showTagLabels !== 'boolean' || typeof showStashEntries !== 'boolean' || typeof showLostCommits !== 'boolean') break;
+          const reload = showStashEntries !== this.graphViewOptions.showStashEntries
+            || showLostCommits !== this.graphViewOptions.showLostCommits;
+          this.graphViewOptions = { showTagLabels, showStashEntries, showLostCommits };
           const seq = reload ? ++this.logSequence : this.logSequence;
           await MainPanel.globalState?.update(`graphViewOptions:${vscode.Uri.file(this.repoPath).fsPath}`, this.graphViewOptions);
           if (reload && !this.disposed && seq === this.logSequence && samePath(repo, this.repoPath)) {
@@ -541,7 +542,7 @@ export class MainPanel {
           this.currentBranchFilter = effectiveBranchFilter;
           this.saveLogFilters();
           if (supersededRefresh) void this.refreshAll();
-          const logPayload = { ...message.payload, loadMore: loadMore === true, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries };
+          const logPayload = { ...message.payload, loadMore: loadMore === true, remoteFilter: effectiveFilter, branches: effectiveBranchFilter, limit: requestedLimit + 1, sortOrder, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries, showLostCommits: this.graphViewOptions.showLostCommits };
           const [allFetched, logBranches] = await Promise.all([
             gitService.log(logPayload),
             gitService.branches(),
@@ -1896,6 +1897,7 @@ export class MainPanel {
     this.graphViewOptions = {
       showTagLabels: saved?.showTagLabels !== false,
       showStashEntries: saved?.showStashEntries !== false,
+      showLostCommits: saved?.showLostCommits === true,
     };
   }
 
@@ -1976,7 +1978,7 @@ export class MainPanel {
       const refreshLimit = this.currentLimit || readInitialCommitCount();
       const remoteFilter = this.currentRemoteFilter;
       const branchFilter = this.currentBranchFilter;
-      const logArgs = { limit: refreshLimit + 1, loadMore: false, sortOrder, remoteFilter, branches: branchFilter, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries };
+      const logArgs = { limit: refreshLimit + 1, loadMore: false, sortOrder, remoteFilter, branches: branchFilter, includeSignature, showStashEntries: this.graphViewOptions.showStashEntries, showLostCommits: this.graphViewOptions.showLostCommits };
 
       const buildLogData = (allFetched: Awaited<ReturnType<typeof this.gitService.log>>, branches: Awaited<ReturnType<typeof this.gitService.branches>>) => {
         const hasMore = allFetched.length > refreshLimit;

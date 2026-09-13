@@ -102,6 +102,17 @@ describe('FileWatcher debounce / cooldown / suppress state machine', () => {
     expect(patterns).not.toContain('worktrees/**');
   });
 
+  it.each([
+    ['logs/HEAD', 'logs/HEAD', 'unknown'],
+    ['logs/refs/**', 'logs/refs/heads/main', 'unknown'],
+    ['worktrees/*/logs/HEAD', 'worktrees/linked/logs/HEAD', 'refs'],
+  ])('refreshes when reflog entries change in %s without moving refs', (pattern, file, change) => {
+    fireOn(pattern, `${REPO}/.git/${file}`);
+    vi.advanceTimersByTime(500);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(change);
+  });
+
   it('does not fire when disabled', () => {
     fw.enabled = false;
     fireOn('**', `${REPO}/src/a.ts`);
