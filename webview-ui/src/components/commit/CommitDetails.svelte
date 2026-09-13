@@ -1279,10 +1279,11 @@
 
   /* ── Top tabs ── */
   .top-tabs {
+    height: var(--pane-toolbar-height);
     display: flex;
     align-items: center;
     gap: 0;
-    padding: 0 8px;
+    padding: 0 5px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
@@ -1292,7 +1293,7 @@
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 5px;
   }
 
   .tab-action-btn, .message-view-toggle {
@@ -1309,7 +1310,24 @@
     font-size: 1.25em;
   }
 
-  .tab-action-btn:hover, .message-view-toggle:hover {
+  .tab-action-btn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .tab-action-btn .codicon {
+    font-size: 14px;
+  }
+
+  .tab-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .message-view-toggle:hover {
     background: rgba(128, 128, 128, 0.2);
     color: var(--text-primary);
   }
@@ -1317,8 +1335,9 @@
   .top-tab {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 8px 16px;
+    align-self: stretch;
+    gap: 4px;
+    padding: 0 12px;
     font-weight: normal;
     background: transparent;
     color: var(--text-secondary);

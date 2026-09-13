@@ -37,6 +37,7 @@
   --bottom-panel-height: 250px;
   --graph-node-radius: 4px;
   --toolbar-height: 44px;
+  --pane-toolbar-height: 37px;
 }
 
 * {

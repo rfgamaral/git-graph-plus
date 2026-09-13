@@ -363,13 +363,14 @@
 
 <style>
   .search-bar {
-    padding: 6px;
+    height: var(--pane-toolbar-height);
+    padding: 5px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     position: relative;
   }
 
@@ -381,9 +382,9 @@
     gap: 4px;
     background: var(--input-bg);
     border: 1px solid var(--input-border, var(--border-color));
-    border-radius: 6px;
-    padding: 0 8px;
-    height: 30px;
+    border-radius: 4px;
+    padding: 0 6px;
+    height: 26px;
     transition: border-color 0.15s;
   }
 
@@ -408,19 +409,24 @@
 
   .search-row:focus-within .search-icon {
     opacity: 1;
-    color: var(--vscode-focusBorder, #007fd4);
   }
 
   .search-input {
     flex: 1;
+    height: 16px;
+    line-height: 16px;
     padding: 0 2px;
     background: transparent;
-    color: var(--input-fg);
+    color: var(--text-secondary);
     border: none;
     font-size: inherit;
     font-family: inherit;
     outline: none;
     min-width: 0;
+  }
+
+  .search-input::placeholder {
+    opacity: 0.8;
   }
 
   .search-count {
@@ -497,16 +503,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    padding: 0;
+    height: 26px;
     flex-shrink: 0;
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
     transition: color 0.1s, border-color 0.1s;
+  }
+
+  .head-btn .codicon, .nav-btn .codicon {
+    font-size: 14px;
   }
 
   .head-btn:hover:not(:disabled) {
@@ -523,12 +534,12 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    height: 30px;
-    padding: 0 8px;
+    height: 26px;
+    padding: 0 6px;
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: inherit;
     font-family: inherit;
     cursor: pointer;
@@ -537,10 +548,11 @@
     max-width: 130px;
   }
 
-  .filter-btn-icon { font-size: 13px; flex-shrink: 0; }
+  .filter-btn-icon { font-size: 14px; flex-shrink: 0; }
 
   .filter-label {
     flex: 1;
+    line-height: 16px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -559,7 +571,11 @@
     border-color: var(--vscode-focusBorder, #007fd4);
   }
 
-  .chevron { font-size: 12px; opacity: 0.7; flex-shrink: 0; }
+  .chevron { font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+
+  .filter-btn:hover .chevron {
+    opacity: 1;
+  }
 
   .filter-count {
     background: var(--vscode-focusBorder, #007fd4);
