@@ -14,7 +14,6 @@
     branches?: BranchInfo[];
     branchFilter?: string[];
     onBranchFilterChange?: (filter: string[]) => void;
-    headOffscreen?: boolean;
     onJumpToHead?: () => void;
   }
 
@@ -27,7 +26,6 @@
     branches = [],
     branchFilter = [],
     onBranchFilterChange = () => {},
-    headOffscreen = false,
     onJumpToHead = () => {},
   }: Props = $props();
 
@@ -243,11 +241,10 @@
 
   <button
     class="head-btn"
-    class:active={headOffscreen}
     onclick={() => onJumpToHead()}
     disabled={!hasHead}
     aria-label={t('search.jumpToHead')}
-    use:tooltip={t('search.jumpToHead')}
+    use:tooltip={t(hasHead ? 'search.jumpToHead' : 'search.headNotInView')}
   >
     <i class="codicon codicon-location"></i>
   </button>
@@ -514,11 +511,6 @@
 
   .head-btn:hover:not(:disabled) {
     color: var(--text-primary);
-    border-color: var(--vscode-focusBorder, #007fd4);
-  }
-
-  .head-btn.active {
-    color: var(--vscode-focusBorder, #007fd4);
     border-color: var(--vscode-focusBorder, #007fd4);
   }
 

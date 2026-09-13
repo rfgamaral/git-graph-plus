@@ -58,7 +58,6 @@ import AmendModal from './components/modals/AmendModal.svelte';
   let bisectMessage = $state<string | null>(null);
   let searchMatchedHashes = $state<Set<string> | null>(null);
   let searchNavigateHash = $state<string | null>(null);
-  let headOffscreen = $state(false);
   let headJumpNonce = $state(0);
   let remoteFilter = $state<string[]>([]);
   let branchFilter = $state<string[]>([]);
@@ -405,6 +404,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
   }
 
   function handleJumpToHead() {
+    const headHash = commitStore.headHash;
+    if (!headHash) return;
+    uiStore.selectCommit(headHash);
     headJumpNonce++;
   }
 
@@ -600,12 +602,11 @@ import AmendModal from './components/modals/AmendModal.svelte';
               branches={branchStore.branches}
               {branchFilter}
               onBranchFilterChange={handleBranchFilterChange}
-              {headOffscreen}
               onJumpToHead={handleJumpToHead}
             />
           {/if}
           {#if !uiStore.commitDetailFullscreen}
-            <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} onHeadOffscreenChange={(v) => headOffscreen = v} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
+            <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
           {/if}
         </div>
         {#if uiStore.showBottomPanel && (uiStore.alwaysShowCommitDetails || uiStore.selectedCommitHash || uiStore.comparing)}

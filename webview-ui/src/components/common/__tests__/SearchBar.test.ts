@@ -351,10 +351,11 @@ describe('SearchBar — jump to HEAD button', () => {
     expect(onJumpToHead).toHaveBeenCalled();
   });
 
-  it('has the active class when headOffscreen is true', () => {
+  it('keeps the HEAD button neutral when enabled', () => {
     setCommits([commit({ hash: 'h1', refs: [{ type: 'head', name: 'HEAD' }] })]);
-    const { container } = render(SearchBar, { ...baseProps, headOffscreen: true });
+    const { container } = render(SearchBar, baseProps);
     const btn = container.querySelector<HTMLButtonElement>('.head-btn')!;
-    expect(btn.classList.contains('active')).toBe(true);
+    expect(btn.classList.contains('active')).toBe(false);
+    expect(btn.disabled).toBe(false);
   });
 });

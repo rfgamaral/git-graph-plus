@@ -290,6 +290,7 @@ export const en: Record<string, string> = {
   'search.prev': 'Previous match (Shift+Enter)',
   'search.next': 'Next match (Enter)',
   'search.jumpToHead': 'Jump to HEAD',
+  'search.headNotInView': 'HEAD not in this view',
   'search.filters': 'Filters',
   'search.authorFilter': 'Author filter',
   'search.sourceFilter': 'Source',
