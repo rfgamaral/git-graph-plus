@@ -24,6 +24,10 @@ function resetStores() {
   branchStore.worktrees = [];
   uiStore.viewMode = 'graph';
   uiStore.fileListMode = 'tree';
+  uiStore.defaultCommitTab = 'details';
+  uiStore.graphViewOptions = { showTagLabels: true, showStashEntries: true, showLostCommits: false };
+  uiStore.focusCommitHash = null;
+  uiStore.focusCommitNonce = 0;
   uiStore.selectCommit(null);
   uiStore.alwaysShowCommitDetails = false;
   uiStore.commitDetailsPosition = 'bottom';
@@ -364,6 +368,122 @@ describe('App — commit details settings', () => {
     postMsg('setCommitDetailsPosition', { position: 'bottom' });
     await waitFor(() => expect(area.style.height).toBe(`${initialHeight + 50}px`));
     expect(area.style.width).toBe('');
+  });
+});
+
+describe('App — sidebar stash preview', () => {
+  const stash: Commit = {
+    hash: 'stash-hash', abbreviatedHash: 'stash-h', subject: 'Saved work', body: '', parents: ['head'],
+    author: { name: 'A', email: 'a@x.com', date: '' },
+    committer: { name: 'A', email: 'a@x.com', date: '' },
+    refs: [{ name: 'stash@{2}', type: 'stash' }],
+  };
+  const head: Commit = { ...stash, hash: 'head', subject: 'Head commit', refs: [{ name: 'HEAD', type: 'head' }] };
+
+  it('opens hidden stash changes without changing filters or View flags', async () => {
+    const { container } = render(App);
+    postMsg('logData', {
+      commits: [head], graph: [], hasMore: false, currentLimit: 100,
+      remoteFilter: ['local'], branches: ['main'],
+    });
+    uiStore.graphViewOptions = { showTagLabels: false, showStashEntries: false, showLostCommits: true };
+    uiStore.viewMode = 'log';
+    uiStore.showBottomPanel = false;
+    globalThis.__postedMessages = [];
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => {
+      expect(container.querySelector('.changes-tab-content')).not.toBeNull();
+      expect(uiStore.selectedCommitHash).toBe(stash.hash);
+      expect(uiStore.stashPreview).toEqual(stash);
+      expect(uiStore.viewMode).toBe('graph');
+    });
+    expect(commitStore.getCommit(stash.hash)).toBeUndefined();
+    expect(uiStore.focusCommitHash).toBeNull();
+    expect(uiStore.graphViewOptions).toEqual({ showTagLabels: false, showStashEntries: false, showLostCommits: true });
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'getCommitDiff', payload: { hash: stash.hash },
+    });
+    expect(globalThis.__postedMessages.some(m => (m.data as { type: string }).type === 'getLog')).toBe(false);
+    await fireEvent.keyDown(window, { key: 'r', ctrlKey: true });
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'getLog', payload: expect.objectContaining({ remoteFilter: ['local'], branches: ['main'] }),
+    });
+  });
+
+  it('focuses a visible stash and returns to Changes when clicked again', async () => {
+    const { container, getByRole } = render(App);
+    postMsg('logData', { commits: [stash, head], graph: [], hasMore: false });
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => {
+      expect(uiStore.focusCommitHash).toBe(stash.hash);
+      expect(container.querySelector('.changes-tab-content')).not.toBeNull();
+    });
+    const nonce = uiStore.focusCommitNonce;
+    await fireEvent.click(getByRole('button', { name: 'Commit' }));
+    expect(container.querySelector('.commit-tab-content')).not.toBeNull();
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => {
+      expect(container.querySelector('.changes-tab-content')).not.toBeNull();
+      expect(uiStore.focusCommitNonce).toBe(nonce + 1);
+    });
+    expect(uiStore.selectedCommitHash).toBe(stash.hash);
+  });
+
+  it.each([false, true])('preserves hidden stash selection on log refresh with always-visible details %s', async (enabled) => {
+    const { container } = render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled });
+    postMsg('logData', { commits: [head], graph: [], hasMore: false });
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => expect(container.querySelector('.changes-tab-content')).not.toBeNull());
+    postMsg('logData', { commits: [head], graph: [], hasMore: false, currentLimit: 200 });
+    await waitFor(() => expect(commitStore.currentLimit).toBe(200));
+    expect(uiStore.selectedCommitHash).toBe(stash.hash);
+    expect(uiStore.stashPreview).toEqual(stash);
+    expect(container.querySelector('.changes-tab-content')).not.toBeNull();
+  });
+
+  it.each(['branchData', 'fullRefresh'])('%s matches stash refs by hash and clears a removed stash', async (type) => {
+    const { container } = render(App);
+    postMsg('logData', { commits: [head], graph: [], hasMore: false });
+    postMsg('showStash', { repo: '/repo-a', commit: structuredClone(stash) });
+    await waitFor(() => expect(container.querySelector('.changes-tab-content')).not.toBeNull());
+    const remaining = { hash: 'another-stash', index: 2, message: 'Different stash', date: '' };
+    const branchData = {
+      branches: [], tags: [], remotes: [], worktrees: [],
+      stashes: [remaining, { ...remaining, hash: stash.hash, index: 0 }],
+    };
+    const logData = { commits: [head], graph: [], hasMore: false };
+    postMsg(type, type === 'fullRefresh' ? { branchData, logData } : branchData);
+    await waitFor(() => expect(uiStore.stashPreview?.refs).toEqual([{ name: 'stash@{0}', type: 'stash' }]));
+    expect(uiStore.selectedCommitHash).toBe(stash.hash);
+    expect(container.querySelector('.changes-tab-content')).not.toBeNull();
+    branchData.stashes = [remaining];
+    postMsg(type, type === 'fullRefresh' ? { branchData, logData } : branchData);
+    await waitFor(() => {
+      expect(uiStore.stashPreview).toBeNull();
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(container.querySelector('.bottom-area')).toBeNull();
+    });
+  });
+
+  it('clears the preview on repository switch and ignores stale stash messages', async () => {
+    const { container } = render(App);
+    postMsg('repoList', { repos: [], active: '/repo-a' });
+    postMsg('logData', { commits: [head], graph: [], hasMore: false });
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => expect(container.querySelector('.changes-tab-content')).not.toBeNull());
+    postMsg('repoList', { repos: [], active: '/repo-b' });
+    await waitFor(() => {
+      expect(uiStore.activeRepo).toBe('/repo-b');
+      expect(uiStore.stashPreview).toBeNull();
+      expect(uiStore.selectedCommitHash).toBeNull();
+    });
+    uiStore.viewMode = 'log';
+    postMsg('showStash', { repo: '/repo-a', commit: stash });
+    await waitFor(() => expect(container.querySelector('.log-container')).not.toBeNull());
+    expect(uiStore.stashPreview).toBeNull();
+    expect(uiStore.selectedCommitHash).toBeNull();
+    expect(uiStore.viewMode).toBe('log');
   });
 });
 

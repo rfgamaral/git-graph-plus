@@ -557,21 +557,13 @@ export function activate(context: vscode.ExtensionContext) {
         });
       }
     }),
-    vscode.commands.registerCommand('gitGraphPlus.showStashMenu', (stashItem) => {
+    vscode.commands.registerCommand('gitGraphPlus.showStashMenu', async (stashItem) => {
       const stash = stashItem?.stash;
-      if (stash) {
-        vscode.window.showQuickPick([
-          { label: `Apply stash@{${stash.index}}`, id: 'apply' },
-          { label: `Pop stash@{${stash.index}}`, id: 'pop' },
-          { label: `Drop stash@{${stash.index}}`, id: 'drop' },
-        ]).then(selected => {
-          if (!selected) return;
-          switch (selected.id) {
-            case 'apply': vscode.commands.executeCommand('gitGraphPlus.stashApply', stashItem); break;
-            case 'pop': vscode.commands.executeCommand('gitGraphPlus.stashPop', stashItem); break;
-            case 'drop': vscode.commands.executeCommand('gitGraphPlus.stashDrop', stashItem); break;
-          }
-        });
+      if (!stash) return;
+      try {
+        await MainPanel.showStashWithPanel(context.extensionUri, activeGitService.rootPath, stash);
+      } catch (err) {
+        vscode.window.showErrorMessage(err instanceof Error ? err.message : String(err));
       }
     }),
     vscode.commands.registerCommand('gitGraphPlus.checkoutRemoteBranchExplicit', (branch) => {

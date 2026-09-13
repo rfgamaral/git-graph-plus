@@ -11,6 +11,7 @@ const H = vi.hoisted(() => {
     tags: vi.fn(async () => []),
     remotes: vi.fn(async () => []),
     stashList: vi.fn(async () => []),
+    searchByHash: vi.fn(async () => null),
     worktreeList: vi.fn(async () => []),
     merge: vi.fn(async () => {}),
     fastForwardRef: vi.fn(async () => {}),
@@ -891,5 +892,79 @@ describe('MainPanel file list preference', () => {
     await dispatch({ type: 'saveFileListMode', payload: { mode } });
     expect(update).not.toHaveBeenCalled();
     expect(values.get('fileListMode')).toBe('list');
+  });
+});
+
+describe('MainPanel sidebar stash previews', () => {
+  const stash = { hash: 'a'.repeat(40), index: 2, message: 'saved work', date: '' };
+
+  beforeEach(() => {
+    H.git.stashList.mockResolvedValue([{ ...stash, index: 1 }]);
+    H.git.searchByHash.mockImplementation(async hash => commit(hash));
+  });
+
+  it('queues the preview until the webview is ready and uses the current stash index', async () => {
+    await MainPanel.showStashWithPanel(extUri, '/repo', stash);
+    expect(postedOfType('showStash')).toEqual([]);
+
+    await dispatch({ type: 'getBranches' });
+
+    expect(postedOfType('showStash')).toEqual([{
+      type: 'showStash', payload: {
+        repo: '/repo', commit: { ...commit(stash.hash), refs: [{ type: 'stash', name: 'stash@{1}' }] },
+      },
+    }]);
+    expect(H.git.searchByHash).toHaveBeenCalledWith(stash.hash);
+    expect(H.git.log).not.toHaveBeenCalled();
+    expect(H.git.stashPop).not.toHaveBeenCalled();
+  });
+
+  it('opens a stash immediately when the webview is ready', async () => {
+    await dispatch({ type: 'getBranches' });
+    await MainPanel.showStashWithPanel(extUri, '/repo', stash);
+    expect(postedOfType('showStash')).toHaveLength(1);
+  });
+
+  it('rejects a removed stash instead of selecting the stash now at its old index', async () => {
+    H.git.stashList.mockResolvedValue([{ ...stash, hash: 'b'.repeat(40) }]);
+    await expect(MainPanel.showStashWithPanel(extUri, '/repo', stash)).rejects.toThrow('This stash is no longer available.');
+    expect(H.git.searchByHash).not.toHaveBeenCalled();
+    expect(postedOfType('showStash')).toEqual([]);
+  });
+
+  it('rejects unavailable commit data', async () => {
+    H.git.searchByHash.mockResolvedValue(null);
+    await expect(MainPanel.showStashWithPanel(extUri, '/repo', stash)).rejects.toThrow('This stash is no longer available.');
+    expect(postedOfType('showStash')).toEqual([]);
+  });
+
+  it('ignores an older preview that finishes after a newer click', async () => {
+    const second = { ...stash, hash: 'b'.repeat(40), index: 0 };
+    H.git.stashList.mockResolvedValue([stash, second]);
+    await dispatch({ type: 'getBranches' });
+    let finish!: (value: ReturnType<typeof commit>) => void;
+    H.git.searchByHash.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const first = MainPanel.showStashWithPanel(extUri, '/repo', stash);
+    await vi.waitFor(() => expect(H.git.searchByHash).toHaveBeenCalledOnce());
+    await MainPanel.showStashWithPanel(extUri, '/repo', second);
+    finish(commit(stash.hash));
+    await first;
+    expect(postedOfType('showStash')).toHaveLength(1);
+    expect(postedOfType('showStash')[0].payload?.commit).toMatchObject({ hash: second.hash });
+  });
+
+  it.each(['branch', 'repo', 'dispose'])('ignores pending previews after %s navigation', async action => {
+    await dispatch({ type: 'getBranches' });
+    let finish!: (value: ReturnType<typeof commit>) => void;
+    H.git.searchByHash.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pending = MainPanel.showStashWithPanel(extUri, '/repo', stash);
+    await vi.waitFor(() => expect(H.git.searchByHash).toHaveBeenCalledOnce());
+    if (action === 'branch') await MainPanel.showBranchWithPanel(extUri, '/repo', 'main');
+    if (action === 'repo') await MainPanel.currentPanel!.switchRepo('/repo-b');
+    if (action === 'dispose') (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    finish(commit(stash.hash));
+    await pending;
+    expect(postedOfType('showStash')).toEqual([]);
+    if (action === 'branch') expect(postedOfType('showBranch')).toEqual([{ type: 'showBranch', payload: { name: 'main' } }]);
   });
 });

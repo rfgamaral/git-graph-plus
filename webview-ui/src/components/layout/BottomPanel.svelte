@@ -6,7 +6,9 @@
 
   let commit = $derived(
     uiStore.selectedCommitHash
-      ? commitStore.getCommit(uiStore.selectedCommitHash)
+      ? uiStore.stashPreview?.hash === uiStore.selectedCommitHash
+        ? uiStore.stashPreview
+        : commitStore.getCommit(uiStore.selectedCommitHash)
       : undefined
   );
   // Armed but fewer than 2 picked yet → prompt the user to select more.

@@ -320,6 +320,13 @@
     }
   });
 
+  $effect(() => {
+    if (uiStore.showCommitChanges && commit?.hash === uiStore.selectedCommitHash) {
+      activeTab = 'changes';
+      uiStore.showCommitChanges = false;
+    }
+  });
+
   // Compare mode keeps activeHash === '' across successive comparisons, so the
   // hash-based reset above never fires when the user switches compare target.
   // Clear the stale file list/diffs the moment the compare refs change, so the

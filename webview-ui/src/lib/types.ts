@@ -111,6 +111,7 @@ export interface TagInfo {
 }
 
 export interface StashEntry {
+  hash?: string;
   index: number;
   message: string;
   date: string;

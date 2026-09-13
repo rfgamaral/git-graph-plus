@@ -46,6 +46,8 @@ export class StashesViewProvider implements vscode.TreeDataProvider<StashItem> {
 }
 
 class StashItem extends vscode.TreeItem {
+  get index(): number { return this.stash.index; }
+
   constructor(public readonly stash: StashEntry) {
     super(`stash@{${stash.index}}`, vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'stash';
@@ -55,7 +57,7 @@ class StashItem extends vscode.TreeItem {
 
     this.command = {
       command: 'gitGraphPlus.showStashMenu',
-      title: 'Show Stash Menu',
+      title: 'Show Stash Changes',
       arguments: [{ stash: this.stash, index: this.stash.index }],
     };
   }

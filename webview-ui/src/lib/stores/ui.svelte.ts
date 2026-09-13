@@ -1,4 +1,4 @@
-import type { InteractiveRebaseMode } from '../types';
+import type { Commit, InteractiveRebaseMode } from '../types';
 
 export const BOTTOM_PANEL_DEFAULT_RATIO = 0.35;
 export const BOTTOM_PANEL_MIN_RATIO = 0.2;
@@ -6,6 +6,8 @@ export const BOTTOM_PANEL_MAX_RATIO = 0.7;
 
 class UiStore {
   selectedCommitHash = $state<string | null>(null);
+  stashPreview = $state<Commit | null>(null);
+  showCommitChanges = $state(false);
   selectedCommitHashes = $state<string[]>([]);
   anchorHash = $state<string | null>(null);
   multiSelectArmed = $state(false);
@@ -64,6 +66,8 @@ class UiStore {
   }
 
   selectCommit(hash: string | null) {
+    if (hash !== this.stashPreview?.hash) this.stashPreview = null;
+    this.showCommitChanges = false;
     this.multiSelectArmed = false;
     this.selectedCommitHash = hash;
     this.selectedCommitHashes = hash ? [hash] : [];

@@ -183,6 +183,15 @@ describe('StashesViewProvider', () => {
     expect(items[0].label).toBe('stash@{0}');
     expect(items[0].description).toBe('WIP');
     expect(items[0].command?.command).toBe('gitGraphPlus.showStashMenu');
+    expect(items[0].command?.title).toBe('Show Stash Changes');
+  });
+
+  it('passes a nonzero stash index to both click and context-menu commands', async () => {
+    const stash = { index: 3, message: 'older work', date: '2024-01-01', hash: 'abc123' };
+    const [item] = await new StashesViewProvider(mockSvc({ stashList: [stash] })).getChildren();
+    expect(item.index).toBe(3);
+    expect(item.stash).toEqual(stash);
+    expect(item.command?.arguments).toEqual([{ stash, index: 3 }]);
   });
 });
 

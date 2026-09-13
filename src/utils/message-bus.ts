@@ -150,6 +150,7 @@ export type WebviewMessage =
 export type ExtensionMessage =
   | { type: 'markdownImage'; payload: { url: string; requestId: string; dataUrl: string | null } }
   | { type: 'showBranch'; payload: { name: string } }
+  | { type: 'showStash'; payload: { repo: string; commit: Commit } }
   | { type: 'setAlwaysShowCommitDetails'; payload: { enabled: boolean } }
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
   | { type: 'authorColors'; payload: { colors: Record<string, string> } }

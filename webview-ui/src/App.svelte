@@ -48,7 +48,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   import FlowStartModal from './components/modals/FlowStartModal.svelte';
   import FlowFinishModal from './components/modals/FlowFinishModal.svelte';
   import BisectBanner from './components/common/BisectBanner.svelte';
-  import type { FlowConfig } from './lib/types';
+  import type { FlowConfig, StashEntry } from './lib/types';
   import { tooltip } from './lib/actions/tooltip';
   import DirtyActionModal from './components/modals/DirtyActionModal.svelte';
   import { dragRebaseMessage, dragMergeMessage } from './lib/utils/dragDrop';
@@ -101,14 +101,14 @@ import AmendModal from './components/modals/AmendModal.svelte';
       }
       return;
     }
-    if (uiStore.selectedCommitHash && !commitStore.getCommit(uiStore.selectedCommitHash)) {
+    if (uiStore.selectedCommitHash && uiStore.stashPreview?.hash !== uiStore.selectedCommitHash && !commitStore.getCommit(uiStore.selectedCommitHash)) {
       uiStore.selectCommit(null);
     }
   }
 
   $effect(() => {
     if (!uiStore.alwaysShowCommitDetails || commitStore.loading || commitStore.notGitRepo || uiStore.multiSelectArmed || uiStore.comparing) return;
-    if (uiStore.selectedCommitHash && commitStore.getCommit(uiStore.selectedCommitHash)) return;
+    if (uiStore.selectedCommitHash && (uiStore.stashPreview?.hash === uiStore.selectedCommitHash || commitStore.getCommit(uiStore.selectedCommitHash))) return;
     const hash = commitStore.headHash ?? commitStore.commits.find(commit => commit.hash !== 'UNCOMMITTED')?.hash ?? null;
     if (uiStore.selectedCommitHash !== hash) uiStore.selectCommit(hash);
   });
@@ -119,6 +119,26 @@ import AmendModal from './components/modals/AmendModal.svelte';
       uiStore.commitDetailFullscreen = false;
     }
   });
+
+  let pendingStashFocus = $state<string | null>(null);
+
+  $effect(() => {
+    if (!pendingStashFocus || commitStore.loading) return;
+    if (commitStore.getCommit(pendingStashFocus)) uiStore.focusCommit(pendingStashFocus);
+    pendingStashFocus = null;
+  });
+
+  function syncStashPreview(stashes: StashEntry[]) {
+    const preview = uiStore.stashPreview;
+    if (!preview) return;
+    const stash = stashes.find(entry => entry.hash === preview.hash);
+    if (stash) {
+      preview.refs = [...preview.refs.filter(ref => ref.type !== 'stash'), { name: `stash@{${stash.index}}`, type: 'stash' }];
+    } else {
+      uiStore.stashPreview = null;
+      if (uiStore.selectedCommitHash === preview.hash) uiStore.selectCommit(null);
+    }
+  }
 
   let pendingBranch = $state<string | null>(null);
 
@@ -213,7 +233,18 @@ import AmendModal from './components/modals/AmendModal.svelte';
     function handleMessage(event: MessageEvent) {
       const msg = event.data;
       switch (msg.type) {
+        case 'showStash':
+          if (uiStore.activeRepo && uiStore.activeRepo !== msg.payload.repo) break;
+          pendingBranch = null;
+          restoreComparison = false;
+          uiStore.viewMode = 'graph';
+          uiStore.stashPreview = msg.payload.commit;
+          uiStore.selectCommit(msg.payload.commit.hash);
+          uiStore.showCommitChanges = true;
+          pendingStashFocus = msg.payload.commit.hash;
+          break;
         case 'showBranch':
+          pendingStashFocus = null;
           uiStore.viewMode = 'graph';
           pendingBranch = msg.payload.name;
           break;
@@ -225,11 +256,13 @@ import AmendModal from './components/modals/AmendModal.svelte';
           break;
         case 'branchData':
           branchStore.setData(msg.payload);
+          syncStashPreview(msg.payload.stashes);
           break;
         case 'fullRefresh':
           remoteFilter = msg.payload.logData.remoteFilter ?? [];
           branchFilter = msg.payload.logData.branches ?? [];
           branchStore.setData(msg.payload.branchData);
+          syncStashPreview(msg.payload.branchData.stashes);
           commitStore.setData(msg.payload.logData);
           pruneInvalidSelection();
           break;
@@ -290,6 +323,8 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'repoList':
           if (uiStore.activeRepo && uiStore.activeRepo !== msg.payload.active) {
             pendingBranch = null;
+            pendingStashFocus = null;
+            if (uiStore.stashPreview) uiStore.selectCommit(null);
             remoteFilter = [];
             branchFilter = [];
             if (uiStore.alwaysShowCommitDetails) uiStore.selectCommit(null);

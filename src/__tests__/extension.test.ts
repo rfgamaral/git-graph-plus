@@ -59,6 +59,7 @@ vi.mock('../panels/MainPanel', () => ({
     static setAvatarCacheDir = vi.fn();
     static createOrShow = vi.fn();
     static showModalWithPanel = vi.fn();
+    static showStashWithPanel = vi.fn();
     static onSidebarRefresh: unknown = null;
     static onRepoChange: unknown = null;
   },
@@ -224,6 +225,42 @@ describe('activate', () => {
     expect(MainPanel.showModalWithPanel).toHaveBeenCalledWith(ctx.extensionUri, {
       modal: 'addWorktree',
       defaultPath: '/repos/project.worktrees',
+    });
+  });
+});
+
+describe('sidebar stash commands', () => {
+  beforeEach(() => {
+    H.workspaceFolders = [{ uri: { fsPath: '/repo' } }];
+    vi.mocked(MainPanel.showStashWithPanel).mockReset().mockResolvedValue(undefined);
+    vi.mocked(MainPanel.showModalWithPanel).mockClear();
+    vi.mocked(window.showQuickPick).mockClear();
+    vi.mocked(window.showErrorMessage).mockClear();
+  });
+
+  it('opens the clicked stash without showing an action menu', async () => {
+    const ctx = makeContext();
+    activate(ctx);
+    const stash = { index: 3, hash: 'abc123', message: 'saved work', date: '' };
+    await H.commandHandlers['gitGraphPlus.showStashMenu']({ stash, index: stash.index });
+    expect(MainPanel.showStashWithPanel).toHaveBeenCalledExactlyOnceWith(ctx.extensionUri, '/repo', stash);
+    expect(window.showQuickPick).not.toHaveBeenCalled();
+    expect(MainPanel.showModalWithPanel).not.toHaveBeenCalled();
+  });
+
+  it('shows an error if the clicked stash is no longer available', async () => {
+    activate(makeContext());
+    vi.mocked(MainPanel.showStashWithPanel).mockRejectedValueOnce(new Error('This stash is no longer available.'));
+    await H.commandHandlers['gitGraphPlus.showStashMenu']({ stash: { index: 2 } });
+    expect(window.showErrorMessage).toHaveBeenCalledExactlyOnceWith('This stash is no longer available.');
+  });
+
+  it.each(['stashPop', 'stashDrop'])('keeps %s on the clicked stash index', async command => {
+    const ctx = makeContext();
+    activate(ctx);
+    await H.commandHandlers[`gitGraphPlus.${command}`]({ index: 3, stash: { index: 3, message: 'older work' } });
+    expect(MainPanel.showModalWithPanel).toHaveBeenCalledExactlyOnceWith(ctx.extensionUri, {
+      modal: command, index: 3, message: 'older work',
     });
   });
 });

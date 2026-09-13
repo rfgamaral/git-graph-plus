@@ -16,13 +16,14 @@ import { AvatarCache } from '../services/avatar-cache';
 import { loadGitHubImage } from '../services/github-image';
 import { resolveGitDirs, shouldRefreshGraph } from '../services/file-watcher-helpers';
 import { RepoDiscoveryService, RepoInfo } from '../services/repo-discovery';
-import type { WebviewMessage, ModalDefaults, GraphViewOptions } from '../utils/message-bus';
+import type { WebviewMessage, ExtensionMessage, ModalDefaults, GraphViewOptions } from '../utils/message-bus';
 import { resolveCommitLinkRules, type LinkRule } from '../git/commit-link-rules';
 import {
   resolveRepoRelativePath as resolveRepoRelativePathUtil,
   assertSafeArgPath as assertSafeArgPathUtil,
 } from '../utils/path-validation';
 import { SequenceGuard } from '../utils/sequence-guard';
+import type { StashEntry } from '../git/types';
 import { resolveDefaultWorktreePath } from '../utils/worktree-path';
 
 export class MainPanel {
@@ -369,6 +370,8 @@ export class MainPanel {
    */
   private swapRepo(newPath: string): void {
     this.repoPath = newPath;
+    this.navigationSequence++;
+    this.pendingNavigation = null;
     this.restoreGraphViewOptions();
     this.gitService = this.createGitService(newPath);
 
@@ -406,7 +409,8 @@ export class MainPanel {
     this.post({ type: 'showModal', payload });
   }
 
-  private pendingBranch: string | null = null;
+  private pendingNavigation: Extract<ExtensionMessage, { type: 'showBranch' | 'showStash' }> | null = null;
+  private navigationSequence = 0;
   private webviewReady = false;
 
   public static async showBranchWithPanel(extensionUri: vscode.Uri, repoPath: string, name: string): Promise<void> {
@@ -415,14 +419,34 @@ export class MainPanel {
     if (!panel) return;
     await panel.switchRepo(repoPath);
     panel.panel.reveal();
-    panel.pendingBranch = name;
-    if (panel.webviewReady) panel.processPendingBranch();
+    panel.navigationSequence++;
+    panel.pendingNavigation = { type: 'showBranch', payload: { name } };
+    if (panel.webviewReady) panel.processPendingNavigation();
   }
 
-  private processPendingBranch(): void {
-    if (!this.pendingBranch) return;
-    this.post({ type: 'showBranch', payload: { name: this.pendingBranch } });
-    this.pendingBranch = null;
+  public static async showStashWithPanel(extensionUri: vscode.Uri, repoPath: string, stash: StashEntry): Promise<void> {
+    if (!MainPanel.currentPanel) MainPanel.createOrShow(extensionUri, repoPath);
+    const panel = MainPanel.currentPanel;
+    if (!panel) return;
+    await panel.switchRepo(repoPath);
+    panel.panel.reveal();
+    const sequence = ++panel.navigationSequence;
+    panel.pendingNavigation = null;
+    const gitService = panel.gitService;
+    const stashes = await gitService.stashList();
+    const current = stashes.find(entry => stash.hash ? entry.hash === stash.hash : entry.index === stash.index);
+    const commit = current?.hash ? await gitService.searchByHash(current.hash) : null;
+    if (panel.disposed || sequence !== panel.navigationSequence || gitService !== panel.gitService) return;
+    if (!commit || !current) throw new Error('This stash is no longer available.');
+    commit.refs = [...commit.refs.filter(ref => ref.type !== 'stash'), { name: `stash@{${current.index}}`, type: 'stash' }];
+    panel.pendingNavigation = { type: 'showStash', payload: { repo: panel.repoPath, commit } };
+    if (panel.webviewReady) panel.processPendingNavigation();
+  }
+
+  private processPendingNavigation(): void {
+    if (!this.pendingNavigation) return;
+    this.post(this.pendingNavigation);
+    this.pendingNavigation = null;
   }
 
   private static pendingModal: { modal: string; [key: string]: any } | null = null;
@@ -595,7 +619,7 @@ export class MainPanel {
             payload: { branches, tags, remotes, stashes, worktrees },
           });
           this.webviewReady = true;
-          this.processPendingBranch();
+          this.processPendingNavigation();
           this.processPendingModal();
           break;
         }
