@@ -13,6 +13,7 @@
 
   let { title, onClose, children, width }: Props = $props();
   let dialogEl: HTMLDivElement | undefined = $state();
+  let top = $state<number>();
 
   onMount(() => {
     // Focus trap
@@ -22,8 +23,21 @@
     function handleEscape(e: KeyboardEvent) {
       if (e.key === 'Escape' && !closed) { closed = true; onClose(); }
     }
+    const dialog = dialogEl!;
+    function updatePosition() {
+      const rect = dialog.getBoundingClientRect();
+      top = Math.max(16, Math.min(top ?? rect.top, window.innerHeight - rect.height - 16));
+    }
+    updatePosition();
+    const observer = new ResizeObserver(updatePosition);
+    observer.observe(dialog, { box: 'border-box' });
+    window.addEventListener('resize', updatePosition);
     window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('keydown', handleEscape);
+    };
   });
 
   // Fallback Enter handler: if focus is still on the dialog (e.g. the primary button
@@ -53,6 +67,7 @@
     role="document"
     tabindex={-1}
     style={width ? `--modal-width: ${width}` : undefined}
+    style:top={top === undefined ? undefined : `${top}px`}
   >
     <div class="modal-header">
       <span class="modal-title">{title}</span>
@@ -76,11 +91,12 @@
   }
 
   .modal {
+    position: absolute;
     background: var(--vscode-editorWidget-background, var(--bg-secondary));
     border: 1px solid rgba(128, 128, 128, 0.3);
     border-radius: 8px;
     width: var(--modal-width, 480px);
-    max-height: 80vh;
+    max-height: min(80vh, calc(100vh - 32px));
     display: flex;
     flex-direction: column;
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
