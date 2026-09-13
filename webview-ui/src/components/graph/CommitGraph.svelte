@@ -27,6 +27,7 @@
   import { modalStore } from '../../lib/stores/modals.svelte';
   import type { Commit, CommitGraphData } from '../../lib/types';
   import { tooltip } from '../../lib/actions/tooltip';
+  import { rememberScroll } from '../../lib/actions/rememberScroll';
   import { getSquashChain } from '../../lib/utils/squash';
   import { chainBranches } from '../../lib/utils/branchChain';
   import RebaseTargetModal from '../modals/RebaseTargetModal.svelte';
@@ -78,6 +79,7 @@
   interface Props {
     searchMatchedHashes?: Set<string> | null;
     searchNavigateHash?: string | null;
+    searchCurrentHash?: string | null;
     bisectActive?: boolean;
     bisectCulpritHash?: string | null;
     remoteFilter?: string[];
@@ -86,7 +88,7 @@
     focusCommitNonce?: number;
   }
 
-  let { searchMatchedHashes = null, searchNavigateHash = null, bisectActive = false, bisectCulpritHash = null, remoteFilter = [], headJumpNonce = 0, focusCommitHash = null, focusCommitNonce = 0 }: Props = $props();
+  let { searchMatchedHashes = null, searchNavigateHash = null, searchCurrentHash = null, bisectActive = false, bisectCulpritHash = null, remoteFilter = [], headJumpNonce = 0, focusCommitHash = null, focusCommitNonce = 0 }: Props = $props();
 
   const vscode = getVsCodeApi();
 
@@ -1351,6 +1353,7 @@
 }} />
 
 <div class="commit-graph" bind:this={container} onscroll={handleScroll}
+  use:rememberScroll={{ key: 'graph', identity: uiStore.activeRepo, ready: !commitStore.loading && displayCommits.length > 0 }}
   style="--author-width: {columnWidths[0]}px; --hash-width: {columnWidths[1]}px; --date-width: {columnWidths[2]}px; --column-padding: {10 * minimumScale}px;">
   {#if commitStore.loading && !isSearchActive}
     <div class="loading"><span class="spinner"></span> {t('graph.loading')}</div>
@@ -1462,7 +1465,7 @@
             class:highlighted={contextMenuHash === commit.hash}
             class:search-match={isSearchActive && searchMatchedHashes?.has(commit.hash)}
             class:search-dim={isSearchActive && !searchMatchedHashes?.has(commit.hash)}
-            class:search-current={searchNavigateHash === commit.hash}
+            class:search-current={(searchCurrentHash ?? searchNavigateHash) === commit.hash}
             class:other-branch={!isSearchActive && !currentBranchCommits.has(commit.hash) && commit.hash !== 'UNCOMMITTED'}
             class:compare-mode={uiStore.multiSelectArmed && !uiStore.selectedCommitHashes.includes(commit.hash)}
             class:compare-base={uiStore.multiSelectArmed && uiStore.selectedCommitHashes.includes(commit.hash)}

@@ -7,6 +7,7 @@ import { branchStore } from '../lib/stores/branches.svelte';
 import { uiStore } from '../lib/stores/ui.svelte';
 import { modalStore } from '../lib/stores/modals.svelte';
 import type { Commit } from '../lib/types';
+import { getVsCodeApi } from '../lib/vscode-api';
 
 function postMsg(type: string, payload?: unknown) {
   window.dispatchEvent(new MessageEvent('message', { data: { type, payload } }));
@@ -1712,5 +1713,164 @@ describe('App — history loading retry', () => {
       cleanup();
       height.mockRestore();
     }
+  });
+});
+
+
+describe('App — working-state restoration', () => {
+  let saved: { repoPath?: string; viewState: Record<string, Record<string, unknown>> };
+  const commits: Commit[] = ['head', 'older', 'oldest'].map((hash, index) => ({
+    hash, abbreviatedHash: hash, subject: `fix ${hash}`, body: '', parents: [],
+    refs: index === 0 ? [{ name: 'HEAD', type: 'head' }] : [],
+    author: { name: 'A', email: 'a@example.com', date: '2026-01-01T00:00:00Z' },
+    committer: { name: 'A', email: 'a@example.com', date: '2026-01-01T00:00:00Z' },
+  }));
+
+  beforeEach(() => {
+    saved = { repoPath: '/repo', viewState: {} };
+    vi.spyOn(getVsCodeApi(), 'getState').mockImplementation(() => saved);
+    vi.spyOn(getVsCodeApi(), 'setState').mockImplementation(value => {
+      saved = JSON.parse(JSON.stringify(value));
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('restores history depth, filters, selection and search index without jumping to HEAD', async () => {
+    saved.viewState = {
+      log: { limit: 600, remoteFilter: ['origin'], branchFilter: ['main'] },
+      ui: { selectedCommitHash: 'older', bottomPanelHeight: 300, rightPanelWidth: 350 },
+      search: { query: 'fix', currentIndex: 1 },
+    };
+    const { container } = render(App);
+    postMsg('setAlwaysShowCommitDetails', { enabled: true });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('older'));
+    expect(commitStore.loading).toBe(true);
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'getLog', payload: { repo: undefined, limit: 600, remoteFilter: ['origin'], branches: ['main'] },
+    });
+    postMsg('repoList', { repos: [{ path: '/repo', name: 'repo' }], active: '/repo' });
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 600 });
+    await waitFor(() => expect(saved.viewState.search.currentIndex).toBe(1));
+    await waitFor(() => expect(container.querySelector('.search-input')).toHaveProperty('value', 'fix'));
+    expect(uiStore.selectedCommitHash).toBe('older');
+    expect(uiStore.rightPanelWidth).toBe(350);
+    expect(uiStore.bottomPanelHeight).toBe(300);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(saved.repoPath).toBe('/repo');
+    expect(saved.viewState.log.limit).toBe(600);
+    postMsg('logData', { commits: [commits[0]], graph: [], hasMore: false, currentLimit: 600 });
+    await waitFor(() => expect(uiStore.selectedCommitHash).toBe('head'));
+  });
+
+  it('writes changes and restores them on a fresh mount', async () => {
+    render(App);
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    uiStore.selectCommit('older');
+    uiStore.rightPanelWidth = 360;
+    uiStore.bottomPanelHeight = 290;
+    uiStore.viewMode = 'log';
+    await waitFor(() => expect(saved.viewState.ui).toMatchObject({
+      selectedCommitHash: 'older', rightPanelWidth: 360, bottomPanelHeight: 290, viewMode: 'log',
+    }));
+    cleanup();
+    resetStores();
+    globalThis.__postedMessages = [];
+    render(App);
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => expect(uiStore.viewMode).toBe('log'));
+    expect(uiStore.selectedCommitHash).toBe('older');
+    expect(uiStore.rightPanelWidth).toBe(360);
+    expect(uiStore.bottomPanelHeight).toBe(290);
+    expect(saved.viewState.log.limit).toBe(400);
+  });
+
+  it.each(['UNCOMMITTED', 'rewritten', null])('recovers restored fullscreen selection %s and stays recovered on a fresh mount', async (selectedCommitHash) => {
+    saved.viewState.ui = { selectedCommitHash, commitDetailFullscreen: true, showBottomPanel: true };
+    const { container } = render(App);
+    await waitFor(() => expect(uiStore.commitDetailFullscreen).toBe(true));
+    expect(commitStore.loading).toBe(true);
+    expect(uiStore.selectedCommitHash).toBe(selectedCommitHash);
+
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => {
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(uiStore.commitDetailFullscreen).toBe(false);
+      expect(container.querySelector('.graph-area.hidden')).toBeNull();
+      expect(container.querySelector('.graph-area')).not.toBeNull();
+      expect(container.querySelector('.bottom-area')).toBeNull();
+      expect(saved.viewState.ui).toMatchObject({ selectedCommitHash: null, commitDetailFullscreen: false });
+    });
+
+    cleanup();
+    resetStores();
+    const fresh = render(App);
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => {
+      expect(commitStore.loading).toBe(false);
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(uiStore.commitDetailFullscreen).toBe(false);
+      expect(fresh.container.querySelector('.graph-area.hidden')).toBeNull();
+      expect(fresh.container.querySelector('.graph-area')).not.toBeNull();
+      expect(fresh.container.querySelector('.bottom-area')).toBeNull();
+    });
+  });
+
+  it.each(['logData', 'fullRefresh'])('preserves valid restored fullscreen details until selection disappears in %s', async (type) => {
+    saved.viewState.ui = { selectedCommitHash: 'older', commitDetailFullscreen: true, showBottomPanel: true };
+    const { container } = render(App);
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => {
+      expect(commitStore.loading).toBe(false);
+      expect(container.querySelector('.bottom-area.fullscreen')).not.toBeNull();
+    });
+    expect(uiStore.selectedCommitHash).toBe('older');
+    expect(uiStore.commitDetailFullscreen).toBe(true);
+
+    const logData = { commits: [commits[0]], graph: [], hasMore: false, currentLimit: 400 };
+    postMsg(type, type === 'logData' ? logData : {
+      logData,
+      branchData: { branches: [], tags: [], remotes: [], stashes: [], worktrees: [] },
+    });
+    await waitFor(() => {
+      expect(uiStore.selectedCommitHash).toBeNull();
+      expect(uiStore.commitDetailFullscreen).toBe(false);
+      expect(container.querySelector('.graph-area.hidden')).toBeNull();
+      expect(saved.viewState.ui.commitDetailFullscreen).toBe(false);
+    });
+  });
+
+  it('leaves fullscreen when restored details are explicitly hidden', async () => {
+    saved.viewState.ui = { selectedCommitHash: 'older', commitDetailFullscreen: true, showBottomPanel: false };
+    const { container } = render(App);
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => {
+      expect(uiStore.commitDetailFullscreen).toBe(false);
+      expect(container.querySelector('.graph-area.hidden')).toBeNull();
+      expect(container.querySelector('.bottom-area')).toBeNull();
+      expect(saved.viewState.ui.commitDetailFullscreen).toBe(false);
+    });
+    expect(uiStore.selectedCommitHash).toBe('older');
+  });
+
+  it.each([
+    { ref2: null, hashes: [], type: 'compareToWorking', payload: { hash: 'older' } },
+    { ref2: 'head', hashes: [], type: 'compareCommits', payload: { ref1: 'older', ref2: 'head' } },
+    { ref2: 'head', hashes: ['oldest', 'head', 'older'], type: 'getMultiCommitSections', payload: { hashes: ['head', 'older', 'oldest'] } },
+  ])('reloads $type after history arrives while details are fullscreen', async ({ ref2, hashes, type, payload }) => {
+    saved.viewState.ui = {
+      comparing: true, compareRef1: 'older', compareRef2: ref2,
+      selectedCommitHashes: hashes, multiSelectArmed: hashes.length > 0,
+      commitDetailFullscreen: true, showBottomPanel: true,
+    };
+    render(App);
+    expect(globalThis.__postedMessages.map(m => m.data)).not.toContainEqual({ type, payload });
+    postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
+    await waitFor(() => expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({ type, payload }));
+    expect(globalThis.__postedMessages.filter(m => (m.data as { type: string }).type === type)).toHaveLength(1);
+    expect(uiStore.commitDetailFullscreen).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
+  import { readViewState, writeViewState } from '../../lib/view-state';
   import { commitStore } from '../../lib/stores/commits.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
@@ -8,6 +9,7 @@
   interface Props {
     onResults: (matchedHashes: Set<string> | null) => void;
     onNavigate: (hash: string) => void;
+    onCurrentResult?: (hash: string | null) => void;
     remotes?: string[];
     remoteFilter?: string[];
     onFilterChange?: (filter: string[]) => void;
@@ -20,6 +22,7 @@
   let {
     onResults,
     onNavigate,
+    onCurrentResult = () => {},
     remotes = [],
     remoteFilter = [],
     onFilterChange = () => {},
@@ -29,9 +32,14 @@
     onJumpToHead = () => {},
   }: Props = $props();
 
-  let query = $state('');
+  const saved = readViewState('search', { query: '', currentIndex: -1 });
+  let query = $state(saved.query);
   let matchedHashes = $state<string[]>([]);
-  let currentIndex = $state(-1);
+  let currentIndex = $state(Number.isSafeInteger(saved.currentIndex) ? saved.currentIndex : -1);
+
+  $effect(() => {
+    writeViewState('search', { query, currentIndex });
+  });
   let inputEl: HTMLInputElement | undefined = $state();
   let filterOpen = $state(false);
   let branchFilterOpen = $state(false);
@@ -108,7 +116,12 @@
     return list;
   });
 
-  function doSearch() {
+  $effect(() => {
+    haystacks;
+    if (!commitStore.loading) untrack(() => doSearch(false));
+  });
+
+  function doSearch(navigate = true) {
     const q = query.trim().toLowerCase();
     if (!q) {
       clear();
@@ -123,23 +136,26 @@
     }
 
     matchedHashes = matched;
-    currentIndex = matched.length > 0 ? 0 : -1;
-    onResults(matched.length > 0 ? new Set(matched) : new Set());
+    currentIndex = matched.length > 0 ? (navigate ? 0 : Math.max(0, Math.min(currentIndex, matched.length - 1))) : -1;
+    onResults(new Set(matched));
+    onCurrentResult(matched[currentIndex] ?? null);
 
-    if (matched.length > 0) {
-      onNavigate(matched[0]);
+    if (navigate && matched.length > 0) {
+      onNavigate(matched[currentIndex]);
     }
   }
 
   function navigatePrev() {
     if (matchedHashes.length === 0) return;
     currentIndex = (currentIndex - 1 + matchedHashes.length) % matchedHashes.length;
+    onCurrentResult(matchedHashes[currentIndex]);
     onNavigate(matchedHashes[currentIndex]);
   }
 
   function navigateNext() {
     if (matchedHashes.length === 0) return;
     currentIndex = (currentIndex + 1) % matchedHashes.length;
+    onCurrentResult(matchedHashes[currentIndex]);
     onNavigate(matchedHashes[currentIndex]);
   }
 
@@ -170,6 +186,7 @@
     matchedHashes = [];
     currentIndex = -1;
     onResults(null);
+    onCurrentResult(null);
   }
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;

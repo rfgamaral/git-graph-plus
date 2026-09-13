@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/svelte';
+import { render, fireEvent, cleanup } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { getVsCodeApi } from '../../../lib/vscode-api';
 import SearchBar from '../SearchBar.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import { commitStore } from '../../../lib/stores/commits.svelte';
@@ -358,4 +360,35 @@ describe('SearchBar — jump to HEAD button', () => {
     expect(btn.classList.contains('active')).toBe(false);
     expect(btn.disabled).toBe(false);
   });
+});
+
+
+it('restores and clamps the current search result after loading without navigating', async () => {
+  const getState = vi.spyOn(getVsCodeApi(), 'getState').mockReturnValue({
+    viewState: { search: { query: 'fix', currentIndex: 9 } },
+  });
+  const onNavigate = vi.fn();
+  const onResults = vi.fn();
+  const onCurrentResult = vi.fn();
+  commitStore.loading = true;
+  try {
+    const { container } = render(SearchBar, { onNavigate, onResults, onCurrentResult });
+    await tick();
+    expect(onResults).not.toHaveBeenCalled();
+    setCommits([commit({ hash: 'h1', subject: 'fix one' }), commit({ hash: 'h2', subject: 'fix two' })]);
+    commitStore.loading = false;
+    await tick();
+    expect(container.querySelector('.search-input')).toHaveProperty('value', 'fix');
+    expect(onResults).toHaveBeenLastCalledWith(new Set(['h1', 'h2']));
+    expect(onCurrentResult).toHaveBeenLastCalledWith('h2');
+    setCommits([commit({ hash: 'h1', subject: 'fix one' })]);
+    await tick();
+    expect(onCurrentResult).toHaveBeenLastCalledWith('h1');
+    expect(onNavigate).not.toHaveBeenCalled();
+  } finally {
+    cleanup();
+    commitStore.loading = false;
+    getState.mockRestore();
+    vi.useRealTimers();
+  }
 });

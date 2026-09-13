@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getVsCodeApi } from '../../lib/vscode-api';
+  import { readViewState, writeViewState } from '../../lib/view-state';
 
   interface Props {
     file: string;
@@ -16,9 +17,16 @@
   let newImage = $state<string | null>(null);
   let oldImageInfo = $state<{ width: number; height: number; bytes: number } | null>(null);
   let newImageInfo = $state<{ width: number; height: number; bytes: number } | null>(null);
-  let mode = $state<'side-by-side' | 'swipe' | 'onion'>('side-by-side');
-  let swipePosition = $state(50);
-  let onionOpacity = $state(0.5);
+  const saved = readViewState('imageDiff', {
+    mode: 'side-by-side' as 'side-by-side' | 'swipe' | 'onion', swipePosition: 50, onionOpacity: 0.5,
+  }, { mode: ['side-by-side', 'swipe', 'onion'] });
+  let mode = $state(saved.mode);
+  let swipePosition = $state(Math.max(0, Math.min(100, saved.swipePosition)));
+  let onionOpacity = $state(Math.max(0, Math.min(1, saved.onionOpacity)));
+
+  $effect(() => {
+    writeViewState('imageDiff', { mode, swipePosition, onionOpacity });
+  });
   let dragging = $state(false);
   let swipeContainerEl = $state<HTMLElement | null>(null);
 

@@ -32,6 +32,19 @@ export function resolveConfiguredGitPath(): string | undefined {
 
 export function activate(context: vscode.ExtensionContext) {
   MainPanel.setGlobalState(context.globalState);
+  context.subscriptions.push(vscode.window.registerWebviewPanelSerializer(MainPanel.viewType, {
+    async deserializeWebviewPanel(panel, state: unknown) {
+      const savedRepo = state && typeof state === 'object' && 'repoPath' in state ? state.repoPath : undefined;
+      const repoPath = typeof savedRepo === 'string' && path.isAbsolute(savedRepo) && existsSync(savedRepo)
+        ? savedRepo
+        : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!repoPath) {
+        panel.dispose();
+        return;
+      }
+      MainPanel.revive(panel, context.extensionUri, repoPath);
+    },
+  }));
   // Status bar is always visible regardless of workspace state
   const statusBar = new StatusBarManager();
   context.subscriptions.push(statusBar);
@@ -183,6 +196,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // --- Auto-detect Git Repo if root isn't one ---
   RepoDiscoveryService.discoverRepos([activeRepoPath]).then(repos => {
+    if (!samePath(activeRepoPath, workspaceFolder.uri.fsPath)) return;
     if (repos.length > 0 && !repos.some(r => samePath(r.path, activeRepoPath))) {
       const firstRepo = repos[0].path;
       activeRepoPath = firstRepo;

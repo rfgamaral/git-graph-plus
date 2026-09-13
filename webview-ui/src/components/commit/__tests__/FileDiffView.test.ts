@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/svelte';
+import { render, cleanup, fireEvent, waitFor } from '@testing-library/svelte';
+import { createHash } from 'node:crypto';
+import { getVsCodeApi } from '../../../lib/vscode-api';
 import FileDiffView from '../FileDiffView.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import { uiStore } from '../../../lib/stores/ui.svelte';
@@ -74,6 +76,60 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe('FileDiffView view restoration', () => {
+  let state: unknown;
+  let previousUi: Pick<typeof uiStore, 'activeRepo' | 'comparing'>;
+
+  beforeEach(() => {
+    previousUi = { activeRepo: uiStore.activeRepo, comparing: uiStore.comparing };
+    uiStore.activeRepo = '/repo';
+    uiStore.comparing = false;
+    vi.spyOn(getVsCodeApi(), 'getState').mockImplementation(() => state);
+    vi.spyOn(getVsCodeApi(), 'setState').mockImplementation(value => { state = value; });
+  });
+
+  afterEach(() => {
+    cleanup();
+    Object.assign(uiStore, previousUi);
+    vi.restoreAllMocks();
+  });
+
+  it.each([true, false])('restores showFullDiff only for matching identity: %s', async (matching) => {
+    const diff = hugeDiff();
+    state = { viewState: { fileDiff: {
+      identity: JSON.stringify(['/repo', matching ? 'deadbeef' : 'other', diff.file, false]),
+      showFullDiff: true,
+    } } };
+    const { container } = render(FileDiffView, { diff, commitHash: 'deadbeef' });
+    await waitFor(() => expect(state).toMatchObject({ viewState: { fileDiff: {
+      fingerprint: createHash('sha256').update(JSON.stringify(diff)).digest('hex'),
+    } } }));
+    expect(container.querySelectorAll('.diff-content .diff-line')).toHaveLength(matching ? 3102 : 3000);
+    expect(!!container.querySelector('.diff-truncated-banner')).toBe(!matching);
+  });
+
+  it.each(['matching', 'changed identity', 'changed content'])('restores lines only with matching identity and SHA-256 content: %s', async (scenario) => {
+    const diff = sampleDiff();
+    state = { viewState: { fileDiff: {
+      identity: JSON.stringify(['/repo', scenario === 'changed identity' ? 'other' : 'deadbeef', diff.file, false]),
+      fingerprint: createHash('sha256').update(JSON.stringify(diff)).digest('hex'),
+      hunkIdx: 0, anchor: 4, indices: ['4', '5'],
+    } } };
+    if (scenario === 'changed content') diff.hunks[0].lines[4].content = 'changed';
+    const onReverse = vi.fn();
+    const { container } = render(FileDiffView, { diff, commitHash: 'deadbeef', onReverse });
+    expect(container.querySelectorAll('.line-selected')).toHaveLength(0);
+    await waitFor(() => expect(getVsCodeApi().setState).toHaveBeenCalled());
+    await waitFor(() => expect(state).toMatchObject({ viewState: { fileDiff: {
+      fingerprint: createHash('sha256').update(JSON.stringify(diff)).digest('hex'),
+      indices: scenario === 'matching' ? ['4', '5'] : [],
+    } } }));
+    expect(container.querySelectorAll('.line-selected')).toHaveLength(scenario === 'matching' ? 2 : 0);
+    rightClick(container.querySelectorAll('.diff-content .diff-line')[4]);
+    expect(onReverse.mock.calls[0][0].selectedLineIndices).toEqual(scenario === 'matching' ? [4, 5] : undefined);
+  });
 });
 
 describe('FileDiffView reverse context menu', () => {

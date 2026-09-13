@@ -8,6 +8,7 @@ import { commitStore } from '../../../lib/stores/commits.svelte';
 import { uiStore } from '../../../lib/stores/ui.svelte';
 import { modalStore } from '../../../lib/stores/modals.svelte';
 import type { Commit, DiffData } from '../../../lib/types';
+import { getVsCodeApi } from '../../../lib/vscode-api';
 
 function commit(over: Partial<Commit> = {}): Commit {
   return {
@@ -71,6 +72,50 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+});
+
+describe('CommitDetails view restoration', () => {
+  let state: unknown;
+
+  beforeEach(() => {
+    vi.spyOn(getVsCodeApi(), 'getState').mockImplementation(() => state);
+    vi.spyOn(getVsCodeApi(), 'setState').mockImplementation(value => { state = value; });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it.each(['h1', 'UNCOMMITTED'])('restores the tab, file, folders and internal width after %s files arrive', async (hash) => {
+    const prefix = hash === 'UNCOMMITTED' ? 'unstaged:' : '';
+    const details = {
+      identity: hash, activeTab: 'changes', uncommittedTab: 'unstaged',
+      selectedFile: `${prefix}src/a.ts`, selectedPatchFiles: [`${prefix}src/a.ts`],
+      expandedDirs: [`${prefix}src`], filesPanelWidth: 320,
+    };
+    state = { viewState: { details } };
+    const { container } = render(CommitDetails, { commit: commit({ hash }) });
+    await waitFor(() => expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual(
+      hash === 'UNCOMMITTED' ? { type: 'getUncommittedDiff' } : { type: 'getCommitDiff', payload: { hash } },
+    ));
+    expect(state).toEqual({ viewState: { details } });
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+
+    const files = [{ path: 'src/a.ts', status: 'M' }, { path: 'hidden/b.ts', status: 'M' }];
+    if (hash === 'UNCOMMITTED') deliverUncommittedDiff([], files);
+    else deliverCommitDiff(hash, files);
+
+    await waitFor(() => expect(container.querySelector('.file-item.selected .file-name')?.textContent).toBe('a.ts'));
+    expect(container.querySelector('.top-tab.active')?.textContent).toMatch(hash === 'UNCOMMITTED' ? /Unstaged/ : /Changes/);
+    expect(container.querySelectorAll('.file-item')).toHaveLength(1);
+    expect(container.querySelector('[title="hidden"]')?.closest('button')?.querySelector('.codicon-chevron-right')).toBeTruthy();
+    expect(container.querySelector<HTMLElement>('.files-panel')?.style.width).toBe('320px');
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual(hash === 'UNCOMMITTED'
+      ? { type: 'getUncommittedFileDiff', payload: { file: 'src/a.ts', staged: false } }
+      : { type: 'getFileDiff', payload: { hash, file: 'src/a.ts' } });
+    expect(state).toMatchObject({ viewState: { details } });
+  });
 });
 
 describe('CommitDetails — request flow', () => {

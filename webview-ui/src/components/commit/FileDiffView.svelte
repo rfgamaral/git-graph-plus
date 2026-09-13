@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { DiffData } from '../../lib/types';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { uiStore } from '../../lib/stores/ui.svelte';
   import { getVsCodeApi } from '../../lib/vscode-api';
   import { t } from '../../lib/i18n/index.svelte';
   import { detectLanguage, highlightLineSync, getHighlighter, ensureLanguage, activeShikiTheme, escapeHtml } from '../../lib/utils/highlighter';
   import ImageDiff from '../common/ImageDiff.svelte';
+  import { readViewState, writeViewState } from '../../lib/view-state';
+  import { rememberScroll } from '../../lib/actions/rememberScroll';
 
   // Right-click target on a diff line. The parent owns the context menu (it
   // already hosts one for the file tree), so we just hand it the location plus
@@ -118,6 +120,7 @@
   function startLineSelect(e: MouseEvent, hunkIdx: number, lineIndex: number) {
     if (e.button !== 0) return; // right/middle-click must not reset an active selection
     if (!canReverse || !isHunkComplete(hunkIdx)) return;
+    restoreSelection = false;
     e.preventDefault(); // suppress native text-selection beginning in the gutter
     if (e.shiftKey && lineSel && lineSel.hunkIdx === hunkIdx) {
       lineSel = { ...lineSel, indices: rangeSet(lineSel.anchor, lineIndex) };
@@ -201,9 +204,15 @@
   let sbsLeftEl = $state<HTMLElement | undefined>();
   let sbsRightEl = $state<HTMLElement | undefined>();
   let isSyncing = false;
+  let restoringScroll = false;
+
+  function restoreSbsScroll() {
+    restoringScroll = true;
+    requestAnimationFrame(() => { restoringScroll = false; });
+  }
 
   function handleSbsScroll(e: Event) {
-    if (isSyncing) return;
+    if (isSyncing || restoringScroll) return;
     const target = e.target as HTMLElement;
     const other = target === sbsLeftEl ? sbsRightEl : sbsLeftEl;
     if (other) {
@@ -223,21 +232,69 @@
   const MAX_RENDER_LINES = 3000;
   let showFullDiff = $state(false);
 
-  // Reset the toggle whenever the diff prop changes, so opening a new large
-  // diff starts collapsed even if the previous one was expanded.
-  $effect(() => {
-    diff;
-    showFullDiff = false;
+  const stateKey = $derived(stacked ? `fileDiff:stacked:${commitHash ?? ''}` : 'fileDiff');
+  const diffIdentity = $derived(JSON.stringify([
+    uiStore.activeRepo,
+    uiStore.comparing && !stacked ? [uiStore.compareRef1, uiStore.compareRef2 ?? 'working'] : commitHash,
+    diff.file, staged,
+  ]));
+  let fingerprint = $state<string | null>(null);
+  let previousDiff: DiffData | undefined;
+  let previousIdentity = '';
+  let initialized = false;
+  let restoreSelection = false;
+
+  $effect.pre(() => {
+    const currentDiff = diff;
+    const identity = diffIdentity;
+    const key = stateKey;
+    const mode = uiStore.diffMode;
+    const initial = !initialized;
+    const changed = currentDiff !== previousDiff || identity !== previousIdentity;
+    const saved = readViewState(key, {
+      identity: '', showFullDiff: false, fingerprint: '', hunkIdx: -1, anchor: -1, indices: [] as string[],
+    });
+    initialized = true;
+    previousDiff = currentDiff;
+    previousIdentity = identity;
+    restoreSelection = initial && saved.identity === identity && mode === 'inline';
+    if (changed) showFullDiff = initial && saved.identity === identity && saved.showFullDiff;
     lineSel = null;
+    fingerprint = null;
+    let cancelled = false;
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(currentDiff)))
+      .then(buffer => {
+        if (cancelled) return;
+        const value = Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join('');
+        const hunk = currentDiff.hunks[saved.hunkIdx];
+        const indices = saved.indices.map(Number);
+        if (restoreSelection && saved.fingerprint === value && Number.isInteger(saved.hunkIdx)
+          && hunk && Number.isInteger(saved.anchor) && saved.anchor >= 0 && saved.anchor < hunk.lines.length
+          && indices.length > 0 && indices.includes(saved.anchor)
+          && saved.indices.every(index => /^(0|[1-9]\d*)$/.test(index))
+          && indices.every(index => Number.isInteger(index) && index >= 0 && index < hunk.lines.length)
+          && untrack(() => canReverse && isHunkComplete(saved.hunkIdx))) {
+          lineSel = { hunkIdx: saved.hunkIdx, anchor: saved.anchor, indices: new Set(indices) };
+        }
+        fingerprint = value;
+      })
+      .catch(() => { if (!cancelled) fingerprint = ''; });
+    return () => { cancelled = true; };
   });
 
   $effect(() => {
-    uiStore.diffMode;
-    lineSel = null;
+    if (fingerprint === null) return;
+    writeViewState(stateKey, {
+      identity: diffIdentity, showFullDiff, fingerprint,
+      hunkIdx: lineSel?.hunkIdx ?? -1,
+      anchor: lineSel?.anchor ?? -1,
+      indices: lineSel ? [...lineSel.indices].map(String) : [],
+    });
   });
 
   function setDiffMode(mode: 'inline' | 'side-by-side') {
     uiStore.diffMode = mode;
+    restoreSelection = false;
     lineSel = null;
     getVsCodeApi().postMessage({ type: 'saveDiffMode', payload: { mode } });
   }
@@ -284,7 +341,7 @@
 
   // Escape clears any active gutter line-selection.
   onMount(() => {
-    const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') lineSel = null; };
+    const onKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') { restoreSelection = false; lineSel = null; } };
     window.addEventListener('keydown', onKeydown);
     return () => window.removeEventListener('keydown', onKeydown);
   });
@@ -377,7 +434,7 @@
     </div>
   </div>
 
-  <div class="diff-panel">
+  <div class="diff-panel" use:rememberScroll={{ key: `${stateKey}:inline`, identity: diffIdentity, ready: uiStore.diffMode === 'inline' }}>
     {#if diffTruncated}
       <div class="diff-truncated-banner">
         <span>{t('details.diffTruncated', { shown: MAX_RENDER_LINES, total: totalDiffLines })}</span>
@@ -431,7 +488,7 @@
                   <span class="line-prefix">{line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}</span>
                 </span>
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <span class="line-content" onmousedown={(e) => { if (e.button === 0) lineSel = null; }}>{@html getHighlighted(hunk.oldStart, lineIndex, line.content)}</span>
+                <span class="line-content" onmousedown={(e) => { if (e.button === 0) { restoreSelection = false; lineSel = null; } }}>{@html getHighlighted(hunk.oldStart, lineIndex, line.content)}</span>
               </div>
             {/each}
           </div>
@@ -443,7 +500,7 @@
            row offers Reverse Hunk). Hovering a hunk in either pane highlights it
            in both (no header bar): both panes write the shared hoveredHunkIdx. -->
       <div class="diff-sbs">
-        <div class="sbs-pane sbs-left" bind:this={sbsLeftEl} onscroll={handleSbsScroll}>
+        <div class="sbs-pane sbs-left" bind:this={sbsLeftEl} use:rememberScroll={{ key: `${stateKey}:left`, identity: diffIdentity, onRestore: restoreSbsScroll }} onscroll={handleSbsScroll}>
           <div class="sbs-inner">
             {#each renderHunks as hunk, hunkIdx}
               {#if hunkIdx > 0}<div class="hunk-separator" aria-hidden="true"></div>{/if}
@@ -472,7 +529,7 @@
             {/each}
           </div>
         </div>
-        <div class="sbs-pane sbs-right" bind:this={sbsRightEl} onscroll={handleSbsScroll}>
+        <div class="sbs-pane sbs-right" bind:this={sbsRightEl} use:rememberScroll={{ key: `${stateKey}:right`, identity: diffIdentity, onRestore: restoreSbsScroll }} onscroll={handleSbsScroll}>
           <div class="sbs-inner">
             {#each renderHunks as hunk, hunkIdx}
               {#if hunkIdx > 0}<div class="hunk-separator" aria-hidden="true"></div>{/if}

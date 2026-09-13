@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import { getVsCodeApi } from './lib/vscode-api';
+  import { readViewState, writeViewState, saveRepoPath } from './lib/view-state';
   import { commitStore } from './lib/stores/commits.svelte';
   import { branchStore } from './lib/stores/branches.svelte';
   import { uiStore, BOTTOM_PANEL_DEFAULT_RATIO, BOTTOM_PANEL_MIN_RATIO, BOTTOM_PANEL_MAX_RATIO } from './lib/stores/ui.svelte';
@@ -53,14 +54,17 @@ import AmendModal from './components/modals/AmendModal.svelte';
   import { dragRebaseMessage, dragMergeMessage } from './lib/utils/dragDrop';
 
   const vscode = getVsCodeApi();
+  commitStore.setLoading(true);
 
   let flowConfig = $state<FlowConfig | null>(null);
   let bisectMessage = $state<string | null>(null);
   let searchMatchedHashes = $state<Set<string> | null>(null);
   let searchNavigateHash = $state<string | null>(null);
+  let searchCurrentHash = $state<string | null>(null);
   let headJumpNonce = $state(0);
-  let remoteFilter = $state<string[]>([]);
-  let branchFilter = $state<string[]>([]);
+  const savedLog = readViewState('log', { limit: 0, remoteFilter: [] as string[], branchFilter: [] as string[] });
+  let remoteFilter = $state(savedLog.remoteFilter);
+  let branchFilter = $state(savedLog.branchFilter);
   let resizing = $state(false);
   let graphLayout: HTMLDivElement | undefined = $state();
   let conflict = $state<{ operation: string; files: Array<{ path: string; resolved: boolean }> } | null>(null);
@@ -109,6 +113,13 @@ import AmendModal from './components/modals/AmendModal.svelte';
     if (uiStore.selectedCommitHash !== hash) uiStore.selectCommit(hash);
   });
 
+  $effect(() => {
+    if (commitStore.loading || !uiStore.commitDetailFullscreen) return;
+    if (!uiStore.showBottomPanel || (!uiStore.selectedCommitHash && !uiStore.comparing)) {
+      uiStore.commitDetailFullscreen = false;
+    }
+  });
+
   let pendingBranch = $state<string | null>(null);
 
   $effect(() => {
@@ -139,10 +150,65 @@ import AmendModal from './components/modals/AmendModal.svelte';
     }
   });
 
+  let mounted = $state(false);
+  let restoreComparison = $state(false);
+
+  $effect(() => {
+    if (!restoreComparison || commitStore.loading || uiStore.viewMode !== 'graph' || !uiStore.showBottomPanel) return;
+    restoreComparison = false;
+    if (uiStore.multiSelectArmed && !uiStore.commitDetailFullscreen) return;
+    void tick().then(() => {
+      const ref1 = uiStore.compareRef1;
+      const ref2 = uiStore.compareRef2;
+      if (!uiStore.comparing || !ref1) return;
+      if (uiStore.multiSelectArmed && uiStore.selectedCommitHashes.length > 2) {
+        const selected = new Set(uiStore.selectedCommitHashes);
+        vscode.postMessage({ type: 'getMultiCommitSections', payload: { hashes: commitStore.commits.filter(c => selected.has(c.hash)).map(c => c.hash) } });
+      } else if (ref2) {
+        vscode.postMessage({ type: 'compareCommits', payload: { ref1, ref2 } });
+      } else {
+        vscode.postMessage({ type: 'compareToWorking', payload: { hash: ref1 } });
+      }
+    });
+  });
+
+  function viewState() {
+    return {
+      selectedCommitHash: uiStore.selectedCommitHash,
+      selectedCommitHashes: [...uiStore.selectedCommitHashes],
+      anchorHash: uiStore.anchorHash,
+      multiSelectArmed: uiStore.multiSelectArmed,
+      comparing: uiStore.comparing,
+      compareRef1: uiStore.compareRef1,
+      compareRef2: uiStore.compareRef2,
+      viewMode: uiStore.viewMode,
+      showBottomPanel: uiStore.showBottomPanel,
+      commitDetailFullscreen: uiStore.commitDetailFullscreen,
+      bottomPanelHeight: uiStore.bottomPanelHeight,
+      rightPanelWidth: uiStore.rightPanelWidth,
+    };
+  }
+
+  $effect(() => {
+    if (!mounted) return;
+    writeViewState('ui', viewState());
+    if (!commitStore.loading && commitStore.currentLimit > 0) {
+      writeViewState('log', { limit: commitStore.currentLimit, remoteFilter: [...remoteFilter], branchFilter: [...branchFilter] });
+    }
+  });
+
   onMount(() => {
     const stopWatchingAvatarTheme = avatarStore.watchTheme();
-    uiStore.bottomPanelHeight = Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO);
-    uiStore.rightPanelWidth = Math.round(window.innerWidth * 0.4);
+    const restored = readViewState('ui', {
+      ...viewState(),
+      bottomPanelHeight: Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO),
+      rightPanelWidth: Math.round(window.innerWidth * 0.4),
+    }, { viewMode: ['graph', 'log', 'stats'] });
+    restored.bottomPanelHeight = Math.max(window.innerHeight * BOTTOM_PANEL_MIN_RATIO, Math.min(window.innerHeight * BOTTOM_PANEL_MAX_RATIO, restored.bottomPanelHeight));
+    restored.rightPanelWidth = Math.max(Math.min(240, window.innerWidth * 0.5), Math.min(window.innerWidth * 0.7, restored.rightPanelWidth));
+    Object.assign(uiStore, restored);
+    restoreComparison = restored.comparing;
+    mounted = true;
 
     function handleMessage(event: MessageEvent) {
       const msg = event.data;
@@ -227,6 +293,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
           }
           uiStore.repos = msg.payload.repos;
           uiStore.activeRepo = msg.payload.active;
+          saveRepoPath(msg.payload.active);
           commitStore.notGitRepo = false;
           break;
         case 'tagDetailsData':
@@ -321,8 +388,14 @@ import AmendModal from './components/modals/AmendModal.svelte';
 
     // Request initial data
     commitStore.setLoading(true);
-    vscode.postMessage({ type: 'getLog', payload: { repo: uiStore.activeRepo || undefined } });
+    vscode.postMessage({ type: 'getLog', payload: {
+      repo: uiStore.activeRepo || undefined,
+      ...(Number.isSafeInteger(savedLog.limit) && savedLog.limit > 0 ? {
+        limit: savedLog.limit, remoteFilter: [...remoteFilter], branches: [...branchFilter],
+      } : {}),
+    } });
     vscode.postMessage({ type: 'getBranches' });
+    vscode.postMessage({ type: 'getRepoList' });
     vscode.postMessage({ type: 'checkFlowStatus' });
     vscode.postMessage({ type: 'getAuthorColors' });
     vscode.postMessage({ type: 'getDiffMode' });
@@ -397,6 +470,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
   function handleSearchResults(hashes: Set<string> | null) {
     searchMatchedHashes = hashes;
     searchNavigateHash = null;
+    searchCurrentHash = null;
   }
 
   function handleSearchNavigate(hash: string) {
@@ -596,6 +670,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
             <SearchBar
               onResults={handleSearchResults}
               onNavigate={handleSearchNavigate}
+              onCurrentResult={(hash) => { searchCurrentHash = hash; }}
               remotes={branchStore.remotes.map(r => r.name)}
               {remoteFilter}
               onFilterChange={handleFilterChange}
@@ -606,7 +681,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
             />
           {/if}
           {#if !uiStore.commitDetailFullscreen}
-            <CommitGraph {searchMatchedHashes} {searchNavigateHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
+            <CommitGraph {searchMatchedHashes} {searchNavigateHash} {searchCurrentHash} headJumpNonce={headJumpNonce} focusCommitHash={uiStore.focusCommitHash} focusCommitNonce={uiStore.focusCommitNonce} bisectActive={bisectMessage !== null} bisectCulpritHash={bisectMessage?.includes('is the first bad commit') ? bisectMessage.match(/^([a-f0-9]{7,40})/)?.[1] ?? null : null} {remoteFilter} />
           {/if}
         </div>
         {#if uiStore.showBottomPanel && (uiStore.alwaysShowCommitDetails || uiStore.selectedCommitHash || uiStore.comparing)}

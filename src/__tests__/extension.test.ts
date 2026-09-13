@@ -28,6 +28,7 @@ vi.mock('vscode', () => ({
     registerTextDocumentContentProvider: () => ({ dispose() {} }),
   },
   window: {
+    registerWebviewPanelSerializer: vi.fn(() => ({ dispose() {} })),
     createTreeView: (id: string) => { H.treeViewsCreated.push(id); return { description: '', dispose() {} }; },
     showWarningMessage: vi.fn(),
     showInformationMessage: vi.fn(async () => undefined),
@@ -50,6 +51,8 @@ vi.mock('fs', () => ({ existsSync: vi.fn(() => true) }));
 vi.mock('../git/git-binary', () => ({ setGitBinaryPath: vi.fn() }));
 vi.mock('../panels/MainPanel', () => ({
   MainPanel: class {
+    static viewType = 'gitGraphPlus';
+    static revive = vi.fn();
     static currentPanel: unknown = undefined;
     static setGlobalState = vi.fn();
     static setExtraEnv = vi.fn();
@@ -74,6 +77,7 @@ void viewStub;
 
 import { activate, resolveConfiguredGitPath } from '../extension';
 import { existsSync } from 'fs';
+import { window } from 'vscode';
 import { MainPanel } from '../panels/MainPanel';
 
 function makeContext() {
@@ -116,6 +120,62 @@ describe('resolveConfiguredGitPath', () => {
     H.gitPathConfig = ['/a/git', '/b/git'];
     vi.mocked(existsSync).mockReturnValue(false);
     expect(resolveConfiguredGitPath()).toBeUndefined();
+  });
+});
+
+describe('native panel restoration', () => {
+  beforeEach(() => {
+    vi.mocked(window.registerWebviewPanelSerializer).mockClear();
+    vi.mocked(MainPanel.revive).mockClear();
+  });
+
+  it('registers the serializer and its disposable even without a workspace', () => {
+    const ctx = makeContext();
+    activate(ctx);
+
+    expect(window.registerWebviewPanelSerializer).toHaveBeenCalledExactlyOnceWith(
+      'gitGraphPlus', expect.objectContaining({ deserializeWebviewPanel: expect.any(Function) }),
+    );
+    expect(ctx.subscriptions).toContain(vi.mocked(window.registerWebviewPanelSerializer).mock.results[0].value);
+  });
+
+  it.each([undefined, [{ uri: { fsPath: '/workspace' } }]])('restores the saved repository with workspace folders %j', async (folders) => {
+    H.workspaceFolders = folders;
+    const ctx = makeContext();
+    activate(ctx);
+    const panel = { dispose: vi.fn() } as unknown as import('vscode').WebviewPanel;
+    const serializer = vi.mocked(window.registerWebviewPanelSerializer).mock.calls[0][1];
+
+    await serializer.deserializeWebviewPanel(panel, { repoPath: '/saved/repo' });
+
+    expect(MainPanel.revive).toHaveBeenCalledExactlyOnceWith(panel, ctx.extensionUri, '/saved/repo');
+    expect(panel.dispose).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, 'invalid', {}, { repoPath: 42 }, { repoPath: 'relative/repo' }, { repoPath: '/missing' }])('falls back to the first workspace for invalid state %j', async (state) => {
+    H.workspaceFolders = [{ uri: { fsPath: '/workspace' } }, { uri: { fsPath: '/second' } }];
+    vi.mocked(existsSync).mockReturnValue(false);
+    const ctx = makeContext();
+    activate(ctx);
+    const panel = { dispose: vi.fn() } as unknown as import('vscode').WebviewPanel;
+    const serializer = vi.mocked(window.registerWebviewPanelSerializer).mock.calls[0][1];
+
+    await serializer.deserializeWebviewPanel(panel, state);
+
+    expect(MainPanel.revive).toHaveBeenCalledExactlyOnceWith(panel, ctx.extensionUri, '/workspace');
+    expect(panel.dispose).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, null, 'invalid', {}, { repoPath: 42 }, { repoPath: 'relative/repo' }, { repoPath: '/missing' }])('disposes the supplied panel without a workspace for invalid state %j', async (state) => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    activate(makeContext());
+    const panel = { dispose: vi.fn() } as unknown as import('vscode').WebviewPanel;
+    const serializer = vi.mocked(window.registerWebviewPanelSerializer).mock.calls[0][1];
+
+    await serializer.deserializeWebviewPanel(panel, state);
+
+    expect(panel.dispose).toHaveBeenCalledOnce();
+    expect(MainPanel.revive).not.toHaveBeenCalled();
   });
 });
 

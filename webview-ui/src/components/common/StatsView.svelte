@@ -4,6 +4,7 @@
   import { avatarStore } from '../../lib/stores/avatars.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
+  import { rememberScroll } from '../../lib/actions/rememberScroll';
 
   interface AuthorStat { author: string; email: string; count: number; }
   interface HourStat { weekday: number; hour: number; count: number; }
@@ -51,7 +52,7 @@
   let maxCount = $derived(byAuthor[0]?.count || 1);
 </script>
 
-<div class="stats-view">
+<div class="stats-view" use:rememberScroll={{ key: 'stats', ready: !loading }}>
   {#if loading}
     <div class="loading"><span class="spinner"></span> {t('stats.loading')}</div>
   {:else}

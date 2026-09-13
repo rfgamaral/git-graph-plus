@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { getVsCodeApi } from '../../lib/vscode-api';
+  import { readViewState, writeViewState } from '../../lib/view-state';
+  import { rememberScroll } from '../../lib/actions/rememberScroll';
   import { t } from '../../lib/i18n/index.svelte';
   import ContextMenu from './ContextMenu.svelte';
   import ResetModal from '../modals/ResetModal.svelte';
@@ -30,23 +32,31 @@
 
   let { active = false }: { active?: boolean } = $props();
 
+  const saved = readViewState('reflog', {
+    query: '', selectedRef: '', activeActions: [] as string[], danglingOnly: false, currentLimit: 200,
+  });
+
   // ── 데이터 ──────────────────────────────────────────────
   let entries       = $state<ReflogEntry[]>([]);
   let loading       = $state(true);
   let hasMore       = $state(false);
   let loadingMore   = $state(false);
-  let currentLimit  = $state(200);
+  let currentLimit  = $state(Number.isSafeInteger(saved.currentLimit) && saved.currentLimit > 0 ? saved.currentLimit : 200);
 
   // ── 검색 ────────────────────────────────────────────────
-  let query         = $state('');
+  let query         = $state(saved.query);
   let inputEl: HTMLInputElement | undefined = $state();
 
   // ── 필터 ────────────────────────────────────────────────
   let refOpen          = $state(false);
   let actionOpen       = $state(false);
-  let selectedRef      = $state('');
-  let activeActions    = $state<Set<string>>(new Set());
-  let danglingOnly     = $state(false);
+  let selectedRef      = $state(saved.selectedRef);
+  let activeActions    = $state<Set<string>>(new Set(saved.activeActions));
+  let danglingOnly     = $state<boolean>(saved.danglingOnly);
+
+  $effect(() => {
+    writeViewState('reflog', { query, selectedRef, activeActions: [...activeActions], danglingOnly, currentLimit });
+  });
 
   const ACTION_TYPES = ['commit', 'checkout', 'reset', 'rebase', 'merge', 'cherry-pick', 'revert', 'stash', 'pull'] as const;
 
@@ -344,7 +354,7 @@
       {entries.length === 0 ? t('reflog.empty') : t('reflog.noMatches')}
     </div>
   {:else}
-    <div class="reflog-list" role="list">
+    <div class="reflog-list" role="list" use:rememberScroll={{ key: 'reflog', ready: !loading }}>
       <div class="reflog-header">
         <div class="col-idx">#</div>
         <div class="col-action">{t('reflog.action')}</div>

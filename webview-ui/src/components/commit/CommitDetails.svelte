@@ -5,7 +5,9 @@
   import { branchStore } from '../../lib/stores/branches.svelte';
   import { uiStore } from '../../lib/stores/ui.svelte';
   import { commitStore } from '../../lib/stores/commits.svelte';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
+  import { readViewState, writeViewState } from '../../lib/view-state';
+  import { rememberScroll } from '../../lib/actions/rememberScroll';
   import { t } from '../../lib/i18n/index.svelte';
   import { avatarStore } from '../../lib/stores/avatars.svelte';
   import { formatDateTime } from '../../lib/utils/date-format';
@@ -38,6 +40,47 @@
   );
 
   const vscode = getVsCodeApi();
+  const saved = readViewState('details', {
+    identity: '', activeTab: 'commit', uncommittedTab: 'staged', selectedFile: null as string | null,
+    selectedPatchFiles: [] as string[], expandedDirs: [] as string[], filesPanelWidth: 240,
+    messageHash: '', messageMode: 'markdown',
+  }, { activeTab: ['commit', 'changes'], uncommittedTab: ['staged', 'unstaged'], messageMode: ['markdown', 'plain'] });
+  const identity = $derived(commit?.hash ?? JSON.stringify([uiStore.compareRef1, uiStore.compareRef2]));
+  let filesLoaded = $state(false);
+  let restorePending = true;
+  let restoreDirectories = true;
+
+  function restoreSelection() {
+    filesLoaded = true;
+    if (!restorePending) return;
+    restorePending = false;
+    if (saved.identity !== identity) return;
+    const paths = uncommittedFiles
+      ? [...uncommittedFiles.staged.map(f => `staged:${f.path}`), ...uncommittedFiles.unstaged.map(f => `unstaged:${f.path}`)]
+      : files.map(f => f.path);
+    selectedFile = saved.selectedFile && paths.includes(saved.selectedFile) ? saved.selectedFile : null;
+    selectedPatchFiles = new Set(saved.selectedPatchFiles.filter(file => paths.includes(file)));
+    if (activeHash === 'UNCOMMITTED' && selectedFile) {
+      vscode.postMessage({ type: 'getUncommittedFileDiff', payload: {
+        file: selectedFile.replace(/^(staged|unstaged):/, ''), staged: selectedFile.startsWith('staged:'),
+      } });
+    }
+  }
+
+  function restoreExpandedDirs(dirs: Set<string>): Set<string> {
+    if (!restoreDirectories) return dirs;
+    restoreDirectories = false;
+    return saved.identity === identity ? new Set(saved.expandedDirs.filter(dir => dirs.has(dir))) : dirs;
+  }
+
+  $effect(() => {
+    if (!filesLoaded) return;
+    writeViewState('details', {
+      identity, activeTab, uncommittedTab, selectedFile, selectedPatchFiles: [...selectedPatchFiles],
+      expandedDirs: [...expandedDirs], filesPanelWidth,
+      messageHash: messageOverride?.hash ?? '', messageMode: messageOverride?.mode ?? 'markdown',
+    });
+  });
 
   interface CommitFile {
     path: string;
@@ -177,7 +220,7 @@
   // passed to FileDiffView and the tree's "Reverse File" action.
   const canReverseInThisView = $derived(!!commit && stashIndex === null);
 
-  let filesPanelWidth = $state(240);
+  let filesPanelWidth = $state(Math.max(120, Math.min(480, saved.filesPanelWidth)));
   let isResizing = $state(false);
   let resizeStartX = 0;
   let resizeStartWidth = 0;
@@ -185,7 +228,7 @@
   let activeTab = $state<'commit' | 'changes'>(
     commit ? (uiStore.defaultCommitTab === 'changes' ? 'changes' : 'commit') : 'changes',
   );
-  let uncommittedTab = $state<'staged' | 'unstaged'>('staged');
+  let uncommittedTab = $state<'staged' | 'unstaged'>(saved.uncommittedTab as 'staged' | 'unstaged');
 
   let activeHash = $state('');
 
@@ -253,6 +296,7 @@
     const hash = commit?.hash ?? '';
     if (hash !== activeHash) {
       activeHash = hash;
+      filesLoaded = false;
       files = [];
       diffs = [];
       sections = [];
@@ -265,7 +309,10 @@
         activeTab = 'changes';
         vscode.postMessage({ type: 'getUncommittedDiff' });
       } else if (hash) {
-        activeTab = uiStore.defaultCommitTab === 'changes' ? 'changes' : 'commit';
+        activeTab = untrack(() => restorePending && saved.identity === identity
+          ? saved.activeTab as 'commit' | 'changes'
+          : uiStore.defaultCommitTab === 'changes' ? 'changes' : 'commit');
+        if (saved.messageHash === hash) messageOverride = { hash, mode: saved.messageMode as 'markdown' | 'plain' };
         vscode.postMessage({ type: 'getCommitDiff', payload: { hash } });
         vscode.postMessage({ type: 'getLfsFiles' });
         vscode.postMessage({ type: 'getCommitSignature', payload: { hash } });
@@ -284,6 +331,7 @@
     if (!commit && uiStore.comparing) {
       // Read r1/r2 above so this effect re-runs whenever they change.
       void r1; void r2;
+      filesLoaded = false;
       files = [];
       diffs = [];
       sections = [];
@@ -309,6 +357,7 @@
         // real commit — the data is only meaningful while viewing UNCOMMITTED.
         if (activeHash !== 'UNCOMMITTED') return;
         uncommittedFiles = msg.payload;
+        restoreSelection();
         if (selectedFile) {
           const isStaged = selectedFile.startsWith('staged:');
           const filePath = selectedFile.replace(/^(staged|unstaged):/, '');
@@ -334,6 +383,7 @@
         files = msg.payload.files;
         diffs = [];
         sections = msg.payload.sections;
+        restoreSelection();
       }
       if (msg.type === 'commitDiffData') {
         // Discard stale responses from previous commit selections
@@ -345,6 +395,7 @@
         // it. Store those diffs so clicking a file shows its content. Normal
         // commit selection omits `diffs` and loads them lazily per file.
         if (msg.payload.diffs) diffs = msg.payload.diffs;
+        restoreSelection();
       }
       if (msg.type === 'fileDiffData') {
         if (msg.payload.hash !== activeHash) return;
@@ -556,10 +607,10 @@
   // Auto-expand all directories when files change
   $effect(() => {
     if (files.length > 0) {
-      expandedDirs = new Set(files.flatMap(({ path: p }) => {
+      expandedDirs = untrack(() => restoreExpandedDirs(new Set(files.flatMap(({ path: p }) => {
         const parts = p.split('/');
         return parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/'));
-      }));
+      }))));
     }
   });
 
@@ -574,7 +625,7 @@
         const parts = p.split('/');
         parts.slice(0, -1).forEach((_, i) => dirs.add('unstaged:' + parts.slice(0, i + 1).join('/')));
       }
-      expandedDirs = dirs;
+      expandedDirs = untrack(() => restoreExpandedDirs(dirs));
     }
   });
 
@@ -668,7 +719,7 @@
 
   <!-- Commit tab -->
   {#if activeTab === 'commit' && commit}
-    <div class="commit-tab-content">
+    <div class="commit-tab-content" use:rememberScroll={{ key: 'commit-message', identity }}>
       <div class="info-section">
         <div class="info-columns">
           <!-- Author -->
@@ -851,7 +902,7 @@
   {:else if activeTab === 'changes'}
     <div class="changes-tab-content">
       <div class="files-panel" style="width: {filesPanelWidth}px">
-        <div class="files-list">
+        <div class="files-list" use:rememberScroll={{ key: 'files', identity: `${identity}:${uncommittedTab}`, ready: filesLoaded }}>
           {#if activeHash === 'UNCOMMITTED' && uncommittedFiles}
             {#snippet renderUncommittedTree(nodes: FileTreeNode[], depth: number, staged: boolean)}
               {#each nodes as node}
@@ -1192,7 +1243,7 @@
           </div>
         </div>
       {:else if selectedSections.length > 0}
-        <div class="sections-pane">
+        <div class="sections-pane" use:rememberScroll={{ key: 'sections', identity: `${identity}:${selectedFile}` }}>
           {#each selectedSections as sec (sec.commit)}
             <FileDiffView
               diff={sec.diff}

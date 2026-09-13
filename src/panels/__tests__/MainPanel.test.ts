@@ -104,7 +104,8 @@ vi.mock('../../services/repo-discovery', () => ({ RepoDiscoveryService: { discov
 vi.mock('../../git/vscode-git-bridge', () => ({ triggerVSCodeGitAuth: vi.fn(async () => false) }));
 
 import { MainPanel } from '../MainPanel';
-import { GitError } from '../../git/git-service';
+import { GitError, GitService } from '../../git/git-service';
+import { window } from 'vscode';
 
 const extUri = { fsPath: '/ext' } as unknown as import('vscode').Uri;
 
@@ -157,6 +158,60 @@ describe('MainPanel construction', () => {
     expect(H.panel).not.toBeNull();
     expect(H.panel!.webview).toBeDefined();
     expect(postedOfType('setLocale').length).toBeGreaterThan(0);
+  });
+});
+
+describe('MainPanel native restoration', () => {
+  afterEach(() => {
+    MainPanel.onRepoChange = null;
+  });
+
+  it('revives the supplied panel with options, icon, HTML, and message routing without creating another', async () => {
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    H.repos = [{ path: '/saved/repo', name: 'repo', type: 'root' }];
+    const panel = vi.mocked(window.createWebviewPanel).getMockImplementation()!(
+      MainPanel.viewType, 'Git Graph+', 1, {},
+    );
+    vi.mocked(window.createWebviewPanel).mockClear();
+    vi.mocked(GitService).mockClear();
+    MainPanel.onRepoChange = vi.fn();
+
+    MainPanel.revive(panel, extUri, '/saved/repo');
+
+    expect(window.createWebviewPanel).not.toHaveBeenCalled();
+    expect(GitService).toHaveBeenCalledExactlyOnceWith('/saved/repo');
+    expect(MainPanel.currentPanel).toBeDefined();
+    expect(MainPanel.onRepoChange).toHaveBeenCalledExactlyOnceWith('/saved/repo');
+    expect(panel.webview.options).toEqual({ enableScripts: true, localResourceRoots: [{}, {}] });
+    expect(panel.iconPath).toEqual({ light: {}, dark: {} });
+    expect(panel.webview.html).not.toBe('');
+    expect(panel.webview.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'setLocale' }));
+    expect(panel.dispose).not.toHaveBeenCalled();
+
+    await dispatch({ type: 'getLog', payload: {} });
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'logData' }));
+    MainPanel.createOrShow(extUri, '/saved/repo');
+    expect(panel.reveal).toHaveBeenCalledWith(1);
+    expect(window.createWebviewPanel).not.toHaveBeenCalled();
+  });
+
+  it('disposes a duplicate restored panel without replacing the active panel', () => {
+    const current = MainPanel.currentPanel;
+    const activePanel = H.panel!;
+    const panel = { dispose: vi.fn() } as unknown as import('vscode').WebviewPanel;
+    MainPanel.onRepoChange = vi.fn();
+    vi.mocked(window.createWebviewPanel).mockClear();
+    vi.mocked(GitService).mockClear();
+
+    MainPanel.revive(panel, extUri, '/saved/repo');
+
+    expect(panel.dispose).toHaveBeenCalledOnce();
+    expect(MainPanel.currentPanel).toBe(current);
+    expect(GitService).not.toHaveBeenCalled();
+    expect(MainPanel.onRepoChange).not.toHaveBeenCalled();
+    expect(window.createWebviewPanel).not.toHaveBeenCalled();
+    expect((activePanel as unknown as import('vscode').WebviewPanel).dispose).not.toHaveBeenCalled();
   });
 });
 

@@ -27,7 +27,7 @@ import { resolveDefaultWorktreePath } from '../utils/worktree-path';
 
 export class MainPanel {
   public static currentPanel: MainPanel | undefined;
-  private static readonly viewType = 'gitGraphPlus';
+  public static readonly viewType = 'gitGraphPlus';
   private static extraEnv: Record<string, string> | undefined = undefined;
   // Shared across panels in this extension host. The on-disk cache lives under
   // globalStorage so every VS Code window reuses the same avatars instead of
@@ -269,6 +269,18 @@ export class MainPanel {
       })
     );
 
+    this.panel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist'),
+        vscode.Uri.joinPath(extensionUri, 'node_modules', '@vscode', 'codicons', 'dist'),
+      ],
+    };
+    this.panel.iconPath = {
+      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icon-light.svg'),
+      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icon-dark.svg'),
+    };
+
     this.panel.webview.html = this.getHtmlForWebview(this.panel.webview);
 
     // Send locale to webview
@@ -340,20 +352,19 @@ export class MainPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, 'webview-ui', 'dist'),
-          vscode.Uri.joinPath(extensionUri, 'node_modules', '@vscode', 'codicons', 'dist'),
-        ],
       }
     );
 
-    // Set tab icon (light bg → dark icon, dark bg → light icon)
-    panel.iconPath = {
-      light: vscode.Uri.joinPath(extensionUri, 'resources', 'icon-light.svg'),
-      dark: vscode.Uri.joinPath(extensionUri, 'resources', 'icon-dark.svg'),
-    };
-
     MainPanel.currentPanel = new MainPanel(panel, extensionUri, repoPath);
+  }
+
+  public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, repoPath: string): void {
+    if (MainPanel.currentPanel) {
+      panel.dispose();
+      return;
+    }
+    MainPanel.currentPanel = new MainPanel(panel, extensionUri, repoPath);
+    MainPanel.onRepoChange?.(repoPath);
   }
 
   public async postRefresh(): Promise<void> {
