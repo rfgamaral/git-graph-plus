@@ -219,7 +219,8 @@
       "editor/title": [
         {
           "command": "gitGraphPlus.open",
-          "group": "navigation"
+          "group": "navigation",
+          "when": "activeWebviewPanelId != gitGraphPlus"
         }
       ],
       "scm/title": [
