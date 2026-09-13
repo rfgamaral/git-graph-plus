@@ -28,6 +28,8 @@ export interface ModalDefaults {
 // Messages from Webview → Extension
 export type WebviewMessage =
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
+  | { type: 'getDiffMode' }
+  | { type: 'saveDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'getAuthorColors' }
   | { type: 'saveAuthorColor'; payload: { email: string; color: string | null } }
   | { type: 'getGraphColumns'; payload: { repo: string; requestId: string } }
@@ -169,6 +171,7 @@ export type ExtensionMessage =
   | { type: 'setLocale'; payload: { locale: string; homeDir?: string } }
   | { type: 'setInteractiveRebaseMode'; payload: { mode: 'ui' | 'classic' } }
   | { type: 'setDefaultCommitTab'; payload: { tab: 'details' | 'changes' } }
+  | { type: 'setDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'setDateTimeFormat'; payload: { format: string } }
   | { type: 'setDefaults'; payload: ModalDefaults }
   | { type: 'setLoadMoreCount'; payload: { count: number } }

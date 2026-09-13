@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import FileDiffView from '../FileDiffView.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
+import { uiStore } from '../../../lib/stores/ui.svelte';
 import type { DiffData } from '../../../lib/types';
 
 // One hunk holding two separate change blocks split by a context line. The whole
@@ -66,7 +67,10 @@ function rightClick(el: Element): MouseEvent {
   return ev;
 }
 
-beforeEach(() => i18n.setLocale('en'));
+beforeEach(() => {
+  i18n.setLocale('en');
+  uiStore.diffMode = 'inline';
+});
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

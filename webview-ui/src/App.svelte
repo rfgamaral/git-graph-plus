@@ -191,6 +191,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
           resizeCleanup?.();
           uiStore.commitDetailsPosition = msg.payload.position;
           break;
+        case 'setDiffMode':
+          uiStore.diffMode = msg.payload.mode;
+          break;
         case 'setDefaultCommitTab':
           uiStore.defaultCommitTab = msg.payload.tab;
           break;
@@ -326,6 +329,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
     vscode.postMessage({ type: 'getBranches' });
     vscode.postMessage({ type: 'checkFlowStatus' });
     vscode.postMessage({ type: 'getAuthorColors' });
+    vscode.postMessage({ type: 'getDiffMode' });
 
     // Refresh conflict status when webview becomes visible
     function handleVisibility() {

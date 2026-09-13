@@ -462,6 +462,17 @@ export class MainPanel {
           this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
           break;
         }
+        case 'getDiffMode': {
+          const saved = MainPanel.globalState?.get('diffMode');
+          this.post({ type: 'setDiffMode', payload: { mode: saved === 'side-by-side' ? saved : 'inline' } });
+          break;
+        }
+        case 'saveDiffMode': {
+          const { mode } = message.payload;
+          if (mode !== 'inline' && mode !== 'side-by-side') break;
+          await MainPanel.globalState?.update('diffMode', mode);
+          break;
+        }
         case 'getAuthorColors': {
           this.post({ type: 'authorColors', payload: { colors: readAuthorColors() } });
           break;

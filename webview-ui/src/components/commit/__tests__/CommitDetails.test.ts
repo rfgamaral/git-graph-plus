@@ -66,6 +66,7 @@ beforeEach(() => {
   uiStore.comparing = false;
   uiStore.showBottomPanel = true;
   uiStore.commitFileSelected = false;
+  uiStore.diffMode = 'inline';
 });
 
 afterEach(() => {

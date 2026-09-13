@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { DiffData } from '../../lib/types';
   import { onMount } from 'svelte';
+  import { uiStore } from '../../lib/stores/ui.svelte';
+  import { getVsCodeApi } from '../../lib/vscode-api';
   import { t } from '../../lib/i18n/index.svelte';
   import { detectLanguage, highlightLineSync, getHighlighter, ensureLanguage, activeShikiTheme, escapeHtml } from '../../lib/utils/highlighter';
   import ImageDiff from '../common/ImageDiff.svelte';
@@ -229,7 +231,16 @@
     lineSel = null;
   });
 
-  let diffMode = $state<'inline' | 'side-by-side'>('inline');
+  $effect(() => {
+    uiStore.diffMode;
+    lineSel = null;
+  });
+
+  function setDiffMode(mode: 'inline' | 'side-by-side') {
+    uiStore.diffMode = mode;
+    lineSel = null;
+    getVsCodeApi().postMessage({ type: 'saveDiffMode', payload: { mode } });
+  }
 
   let totalDiffLines = $derived(
     diff && !diff.isBinary
@@ -355,12 +366,12 @@
       </span>
       <div class="diff-mode-toggle">
         <button
-          class:active={diffMode === 'inline'}
-          onclick={() => { diffMode = 'inline'; lineSel = null; }}
+          class:active={uiStore.diffMode === 'inline'}
+          onclick={() => setDiffMode('inline')}
         >{t('details.inline')}</button>
         <button
-          class:active={diffMode === 'side-by-side'}
-          onclick={() => { diffMode = 'side-by-side'; lineSel = null; }}
+          class:active={uiStore.diffMode === 'side-by-side'}
+          onclick={() => setDiffMode('side-by-side')}
         >{t('details.sideBySide')}</button>
       </div>
     </div>
@@ -383,7 +394,7 @@
       {/if}
     {:else if diff.isBinary}
       <div class="diff-empty">{t('details.binaryFile')}</div>
-    {:else if diffMode === 'inline'}
+    {:else if uiStore.diffMode === 'inline'}
       <div class="diff-content">
         {#each renderHunks as hunk, hunkIdx}
           <div class="diff-hunk" class:reversible={canReverse && isHunkComplete(hunkIdx)} class:has-selection={lineSel?.hunkIdx === hunkIdx && selectedChangedIndices.length > 0}>
