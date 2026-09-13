@@ -681,24 +681,14 @@
   });
 
   function statusColor(s?: string): string {
-    if (document.body.classList.contains('vscode-light')) {
-      switch (s) {
-        case 'A': return '#2e7d32';
-        case 'M': return '#8a6d3b';
-        case 'D': return '#b71c1c';
-        case 'R': return '#1565c0';
-        case 'C': return '#6a1b9a';
-        case 'N': return '#616161';
-        default: return 'var(--text-secondary)';
-      }
-    }
     switch (s) {
-      case 'A': return '#4caf50';
-      case 'M': return '#e2c08d';
-      case 'D': return '#f44336';
-      case 'R': return '#2196f3';
-      case 'C': return '#9c27b0';
-      case 'N': return '#9e9e9e';
+      case 'A': return 'var(--vscode-gitDecoration-addedResourceForeground, var(--text-secondary))';
+      case 'M': return 'var(--vscode-gitDecoration-modifiedResourceForeground, var(--text-secondary))';
+      case 'D': return 'var(--vscode-gitDecoration-deletedResourceForeground, var(--text-secondary))';
+      case 'R':
+      case 'C': return 'var(--vscode-gitDecoration-renamedResourceForeground, var(--text-secondary))';
+      case 'U': return 'var(--vscode-gitDecoration-untrackedResourceForeground, var(--text-secondary))';
+      case 'N': return 'var(--vscode-gitDecoration-submoduleResourceForeground, var(--text-secondary))';
       default: return 'var(--text-secondary)';
     }
   }
