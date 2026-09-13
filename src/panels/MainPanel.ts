@@ -473,6 +473,17 @@ export class MainPanel {
           this.post({ type: 'setCommitDetailsPosition', payload: { position: readCommitDetailsPosition() } });
           break;
         }
+        case 'getFileListMode': {
+          const saved = MainPanel.globalState?.get('fileListMode');
+          this.post({ type: 'setFileListMode', payload: { mode: saved === 'list' ? saved : 'tree' } });
+          break;
+        }
+        case 'saveFileListMode': {
+          const { mode } = message.payload;
+          if (mode !== 'tree' && mode !== 'list') break;
+          await MainPanel.globalState?.update('fileListMode', mode);
+          break;
+        }
         case 'getDiffMode': {
           const saved = MainPanel.globalState?.get('diffMode');
           this.post({ type: 'setDiffMode', payload: { mode: saved === 'side-by-side' ? saved : 'inline' } });

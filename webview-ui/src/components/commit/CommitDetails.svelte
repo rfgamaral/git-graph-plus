@@ -43,7 +43,7 @@
   const saved = readViewState('details', {
     identity: '', activeTab: 'commit', uncommittedTab: 'staged', selectedFile: null as string | null,
     selectedPatchFiles: [] as string[], expandedDirs: [] as string[], filesPanelWidth: 240,
-    messageHash: '', messageMode: 'markdown',
+    messageHash: '', messageMode: 'markdown', fileFilter: '',
   }, { activeTab: ['commit', 'changes'], uncommittedTab: ['staged', 'unstaged'], messageMode: ['markdown', 'plain'] });
   const identity = $derived(commit?.hash ?? JSON.stringify([uiStore.compareRef1, uiStore.compareRef2]));
   let filesLoaded = $state(false);
@@ -76,7 +76,7 @@
   $effect(() => {
     if (!filesLoaded) return;
     writeViewState('details', {
-      identity, activeTab, uncommittedTab, selectedFile, selectedPatchFiles: [...selectedPatchFiles],
+      identity, activeTab, uncommittedTab, selectedFile, fileFilter, selectedPatchFiles: [...selectedPatchFiles],
       expandedDirs: [...expandedDirs], filesPanelWidth,
       messageHash: messageOverride?.hash ?? '', messageMode: messageOverride?.mode ?? 'markdown',
     });
@@ -494,6 +494,33 @@
   }
 
   let expandedDirs = $state<Set<string>>(new Set());
+  let fileFilter = $state(saved.fileFilter);
+  let fileFilterInput = $state<HTMLInputElement>();
+  const normalizedFileFilter = $derived(fileFilter.trim().toLowerCase());
+  const selectedFileVisible = $derived(selectedFile !== null && (
+    activeHash === 'UNCOMMITTED' ? selectedFile.replace(/^(staged|unstaged):/, '') : selectedFile
+  ).toLowerCase().includes(normalizedFileFilter));
+
+  function toggleFileListMode() {
+    uiStore.fileListMode = uiStore.fileListMode === 'tree' ? 'list' : 'tree';
+    vscode.postMessage({ type: 'saveFileListMode', payload: { mode: uiStore.fileListMode } });
+  }
+
+  function clearFileFilter() {
+    fileFilter = '';
+    fileFilterInput?.focus();
+  }
+
+  function visibleFileNodes(commitFiles: CommitFile[]): FileTreeNode[] {
+    const matches = commitFiles.filter(file => file.path.toLowerCase().includes(normalizedFileFilter));
+    return uiStore.fileListMode === 'tree' ? buildFileTree(matches) : matches
+      .map(file => ({ name: file.path, path: file.path, status: file.status, isFile: true, children: [] }))
+      .sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  function isDirectoryExpanded(path: string): boolean {
+    return normalizedFileFilter !== '' || expandedDirs.has(path);
+  }
 
   function compactDirectoryChains(nodes: FileTreeNode[]): FileTreeNode[] {
     return nodes.map(node => {
@@ -565,18 +592,42 @@
   // already highlighted individually, so highlighting the folder too is redundant
   // (and looked wrong for a folder holding a single, plainly-selected file).
   function isFolderSelected(node: FileTreeNode): boolean {
-    if (expandedDirs.has(node.path)) return false;
+    if (isDirectoryExpanded(node.path)) return false;
     const filesUnder = collectFilePaths(node);
     return filesUnder.length > 0 && filesUnder.every(p => selectedPatchFiles.has(p));
   }
 
-  let fileTree = $derived(buildFileTree(files));
+  let fileTree = $derived(visibleFileNodes(files));
   // Memoize the uncommitted trees too. They were rebuilt inline in the
   // template ({@render renderUncommittedTree(buildFileTree(...))}), so any
   // reactive change (selection, expand/collapse) re-ran buildFileTree over
   // both lists on every render.
-  let stagedTree = $derived(uncommittedFiles ? buildFileTree(uncommittedFiles.staged) : []);
-  let unstagedTree = $derived(uncommittedFiles ? buildFileTree(uncommittedFiles.unstaged) : []);
+  let stagedTree = $derived(uncommittedFiles ? visibleFileNodes(uncommittedFiles.staged) : []);
+  let unstagedTree = $derived(uncommittedFiles ? visibleFileNodes(uncommittedFiles.unstaged) : []);
+  let initialFileSelectionIdentity: string | null = null;
+
+  $effect(() => {
+    if (!filesLoaded || activeTab !== 'changes' || initialFileSelectionIdentity === identity) return;
+    initialFileSelectionIdentity = identity;
+    if (selectedFile || (saved.identity === identity && saved.activeTab === 'changes')) return;
+    const nodes = activeHash === 'UNCOMMITTED'
+      ? (uncommittedTab === 'staged' ? stagedTree : unstagedTree)
+      : fileTree;
+    const firstFile = nodes.flatMap(collectFilePaths)[0];
+    if (!firstFile) return;
+    if (activeHash === 'UNCOMMITTED') {
+      selectedFile = `${uncommittedTab}:${firstFile}`;
+      const list = uncommittedFiles?.[uncommittedTab] ?? [];
+      if (list.find(file => file.path === firstFile)?.status !== 'N') {
+        vscode.postMessage({ type: 'getUncommittedFileDiff', payload: {
+          file: firstFile, staged: uncommittedTab === 'staged',
+        } });
+      }
+    } else {
+      selectedFile = firstFile;
+      selectedPatchFiles = new Set([firstFile]);
+    }
+  });
 
   // Mirror the local file selection into the store so the global Esc handler can
   // tell whether a file is selected. Cleared on unmount so a closed panel never
@@ -666,6 +717,7 @@
   }
 
   function toggleDir(dirPath: string) {
+    if (normalizedFileFilter) return;
     const next = new Set(expandedDirs);
     if (next.has(dirPath)) {
       next.delete(dirPath);
@@ -902,6 +954,32 @@
   {:else if activeTab === 'changes'}
     <div class="changes-tab-content">
       <div class="files-panel" style="width: {filesPanelWidth}px">
+        <div class="files-toolbar">
+          <div class="file-search" class:no-results={normalizedFileFilter !== '' && (activeHash === 'UNCOMMITTED' ? (uncommittedTab === 'staged' ? stagedTree : unstagedTree) : fileTree).length === 0}>
+            <i class="codicon codicon-search file-search-icon"></i>
+            <input
+              bind:this={fileFilterInput}
+              bind:value={fileFilter}
+              type="text"
+              placeholder={t('file.filterPlaceholder')}
+              aria-label={t('file.filterPlaceholder')}
+              onkeydown={(event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation();
+                  clearFileFilter();
+                }
+              }}
+            />
+            {#if fileFilter}
+              <button class="file-toolbar-btn" onclick={clearFileFilter} aria-label={t('file.clearFilter')} use:tooltip={t('file.clearFilter')}>
+                <i class="codicon codicon-close"></i>
+              </button>
+            {/if}
+          </div>
+          <button class="file-toolbar-btn" onclick={toggleFileListMode} aria-label={t(uiStore.fileListMode === 'tree' ? 'file.switchToList' : 'file.switchToTree')} use:tooltip={t(uiStore.fileListMode === 'tree' ? 'file.switchToList' : 'file.switchToTree')}>
+            <i class="codicon" class:codicon-list-flat={uiStore.fileListMode === 'tree'} class:codicon-list-tree={uiStore.fileListMode === 'list'}></i>
+          </button>
+        </div>
         <div class="files-list" use:rememberScroll={{ key: 'files', identity: `${identity}:${uncommittedTab}`, ready: filesLoaded }}>
           {#if activeHash === 'UNCOMMITTED' && uncommittedFiles}
             {#snippet renderUncommittedTree(nodes: FileTreeNode[], depth: number, staged: boolean)}
@@ -911,7 +989,7 @@
                     class="file-item"
                     class:selected={selectedFile === `${staged ? 'staged' : 'unstaged'}:${node.path}`}
                     class:context-active={contextMenuRowKey === `${staged ? 'staged' : 'unstaged'}:${node.path}`}
-                    style="padding-left: {8 + depth * 16 + 18}px;"
+                    style="padding-left: {8 + depth * 16 + (uiStore.fileListMode === 'tree' ? 18 : 0)}px;"
                     onclick={() => {
                       const key = `${staged ? 'staged' : 'unstaged'}:${node.path}`;
                       selectedFile = selectedFile === key ? null : key;
@@ -961,7 +1039,7 @@
                     }}
                   >
                     <i class="codicon codicon-file"></i>
-                    <span class="file-name truncate">{node.name}</span>
+                    <span class="file-name truncate" title={node.path}>{node.name}</span>
                     {#if node.status}
                       <span class="file-status" style="color: {statusColor(node.status)}" use:tooltip={statusLabel(node.status)}>{node.status}</span>
                     {/if}
@@ -972,24 +1050,28 @@
                     style="padding-left: {8 + depth * 16}px;"
                     onclick={() => toggleDir(`${staged ? 'staged' : 'unstaged'}:${node.path}`)}
                   >
-                    <i class="codicon" class:codicon-chevron-right={!expandedDirs.has(`${staged ? 'staged' : 'unstaged'}:${node.path}`)} class:codicon-chevron-down={expandedDirs.has(`${staged ? 'staged' : 'unstaged'}:${node.path}`)}></i>
+                    <i class="codicon" class:codicon-chevron-right={!isDirectoryExpanded(`${staged ? 'staged' : 'unstaged'}:${node.path}`)} class:codicon-chevron-down={isDirectoryExpanded(`${staged ? 'staged' : 'unstaged'}:${node.path}`)}></i>
                     <i class="codicon codicon-folder"></i>
                     <span class="dir-name" title={node.path}>{node.name}</span>
                   </button>
-                  {#if expandedDirs.has(`${staged ? 'staged' : 'unstaged'}:${node.path}`)}
+                  {#if isDirectoryExpanded(`${staged ? 'staged' : 'unstaged'}:${node.path}`)}
                     {@render renderUncommittedTree(node.children, depth + 1, staged)}
                   {/if}
                 {/if}
               {/each}
             {/snippet}
             {#if uncommittedTab === 'staged'}
-              {#if uncommittedFiles.staged.length > 0}
+              {#if normalizedFileFilter && stagedTree.length === 0}
+                <div class="empty-state-text">{t('file.noMatches')}</div>
+              {:else if uncommittedFiles.staged.length > 0}
                 {@render renderUncommittedTree(stagedTree, 0, true)}
               {:else}
                 <div class="empty-state-text">No staged changes</div>
               {/if}
             {:else}
-              {#if uncommittedFiles.unstaged.length > 0}
+              {#if normalizedFileFilter && unstagedTree.length === 0}
+                <div class="empty-state-text">{t('file.noMatches')}</div>
+              {:else if uncommittedFiles.unstaged.length > 0}
                 {@render renderUncommittedTree(unstagedTree, 0, false)}
               {:else}
                 <div class="empty-state-text">No unstaged changes</div>
@@ -1003,7 +1085,7 @@
                   class="file-item"
                   class:selected={selectedPatchFiles.has(node.path)}
                   class:context-active={contextMenuRowKey === node.path}
-                  style="padding-left: {8 + depth * 16 + 18}px;"
+                  style="padding-left: {8 + depth * 16 + (uiStore.fileListMode === 'tree' ? 18 : 0)}px;"
                   onclick={(e) => {
                     if ((e.ctrlKey || e.metaKey) && commit) {
                       // Add/remove this file from the selection; reassign for reactivity.
@@ -1152,7 +1234,7 @@
                   }}
                 >
                   <i class="codicon codicon-file"></i>
-                  <span class="file-name truncate">{node.name}</span>
+                  <span class="file-name truncate" title={node.path}>{node.name}</span>
                   {#if lfsFileSet.has(node.path)}
                     <span class="lfs-badge" class:locked={lfsLockMap.has(node.path)} use:tooltip={lfsLockMap.has(node.path) ? t('lfs.locked', { owner: lfsLockMap.get(node.path) ?? '' }) : 'LFS'}>
                       {#if lfsLockMap.has(node.path)}<i class="codicon codicon-lock"></i>{/if}
@@ -1215,17 +1297,21 @@
                     fileContextMenu = { x: e.clientX, y: e.clientY, items: folderItems };
                   }}
                 >
-                  <i class="codicon" class:codicon-chevron-right={!expandedDirs.has(node.path)} class:codicon-chevron-down={expandedDirs.has(node.path)}></i>
+                  <i class="codicon" class:codicon-chevron-right={!isDirectoryExpanded(node.path)} class:codicon-chevron-down={isDirectoryExpanded(node.path)}></i>
                   <i class="codicon codicon-folder"></i>
                   <span class="dir-name" title={node.path}>{node.name}</span>
                 </button>
-                {#if expandedDirs.has(node.path)}
+                {#if isDirectoryExpanded(node.path)}
                   {@render renderTree(node.children, depth + 1)}
                 {/if}
               {/if}
             {/each}
           {/snippet}
-          {@render renderTree(fileTree, 0)}
+          {#if normalizedFileFilter && fileTree.length === 0}
+            <div class="empty-state-text">{t('file.noMatches')}</div>
+          {:else}
+            {@render renderTree(fileTree, 0)}
+          {/if}
           {/if}
         </div>
       </div>
@@ -1236,7 +1322,9 @@
         onmousedown={startResize}
       ></div>
 
-      {#if selectedIsNestedRepo}
+      {#if !selectedFileVisible}
+        <div class="file-preview-empty">{t('file.selectToView')}</div>
+      {:else if selectedIsNestedRepo}
         <div class="diff-wrapper">
           <div class="diff-panel">
             <div class="diff-empty">{t('details.nestedRepoHint')}</div>
@@ -1740,6 +1828,72 @@
     flex-direction: column;
     overflow: hidden;
   }
+
+  .files-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 29px;
+    flex-shrink: 0;
+    padding: 4px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+  }
+
+  .file-search {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: 3px;
+    height: 20px;
+    padding: 0 4px;
+    border: 1px solid var(--input-border, var(--border-color));
+    border-radius: 4px;
+    background: var(--input-bg);
+    transition: border-color 0.15s;
+  }
+
+  .file-search:focus-within { border-color: var(--vscode-focusBorder, #007fd4); }
+  .file-search.no-results { border-color: var(--vscode-inputValidation-warningBorder, #b89500); }
+  .file-search-icon { font-size: 12px; color: var(--text-secondary); opacity: 0.6; flex-shrink: 0; }
+  .file-search:focus-within .file-search-icon { opacity: 1; }
+
+  .file-search input {
+    flex: 1;
+    min-width: 0;
+    height: 14px;
+    line-height: 14px;
+    padding: 0 2px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  .file-search input::placeholder { opacity: 0.8; }
+
+  .file-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    transition: background 0.1s;
+  }
+
+  .file-toolbar-btn .codicon { font-size: 12px; }
+  .file-toolbar-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .file-search .file-toolbar-btn { width: 16px; height: 16px; }
+  .file-search .file-toolbar-btn:hover { background: rgba(244, 67, 54, 0.15); color: #f44336; }
+  .file-preview-empty { min-width: 0; flex: 1; display: grid; place-items: center; padding: 20px; color: var(--text-secondary); }
 
   .resize-handle {
     width: 1px;

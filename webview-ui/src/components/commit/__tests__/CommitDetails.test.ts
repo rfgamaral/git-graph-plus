@@ -68,6 +68,8 @@ beforeEach(() => {
   uiStore.showBottomPanel = true;
   uiStore.commitFileSelected = false;
   uiStore.diffMode = 'inline';
+  uiStore.fileListMode = 'tree';
+  uiStore.defaultCommitTab = 'details';
 });
 
 afterEach(() => {
@@ -85,6 +87,21 @@ describe('CommitDetails view restoration', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it.each(['h1', 'UNCOMMITTED'])('preserves saved deselection after %s files arrive', async (hash) => {
+    state = { viewState: { details: { identity: hash, activeTab: 'changes', selectedFile: null } } };
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash }) });
+    const files = [{ path: 'a.ts', status: 'M' }];
+    if (hash === 'UNCOMMITTED') deliverUncommittedDiff(files, []);
+    else deliverCommitDiff(hash, files);
+    await waitFor(() => expect(container.querySelectorAll('.file-item')).toHaveLength(1));
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+    await fireEvent.input(getByRole('textbox'), { target: { value: 'a.ts' } });
+    await fireEvent.click(getByRole('button', { name: 'Clear file filter' }));
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+    expect(container.querySelector('.file-preview-empty')).not.toBeNull();
+    expect(globalThis.__postedMessages.map(m => m.data)).not.toContainEqual(expect.objectContaining({ type: hash === 'UNCOMMITTED' ? 'getUncommittedFileDiff' : 'getFileDiff' }));
   });
 
   it.each(['h1', 'UNCOMMITTED'])('restores the tab, file, folders and internal width after %s files arrive', async (hash) => {
@@ -267,6 +284,137 @@ describe('CommitDetails — files list', () => {
     await new Promise(r => setTimeout(r, 30));
     const counts = Array.from(container.querySelectorAll('.tab-count')).map(c => c.textContent?.trim());
     expect(counts).toContain('0'); // still 0 files
+  });
+});
+
+describe('CommitDetails file filtering and layout', () => {
+  const files = [
+    { path: 'a.ts', status: 'M' },
+    { path: 'src/deep/z.ts', status: 'A' },
+    { path: 'src/other.ts', status: 'M' },
+  ];
+
+  it.each(['tree', 'list'] as const)('selects the first %s file only when Changes opens, once per commit', async (mode) => {
+    uiStore.fileListMode = mode;
+    const { container, getByRole, rerender } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    deliverCommitDiff('h1', files);
+    await waitFor(() => expect(container.querySelector('.tab-count')?.textContent).toBe('3'));
+    expect(uiStore.commitFileSelected).toBe(false);
+    expect(globalThis.__postedMessages.map(m => m.data)).not.toContainEqual(expect.objectContaining({ type: 'getFileDiff' }));
+
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    const firstPath = mode === 'tree' ? 'src/deep/z.ts' : 'a.ts';
+    expect(container.querySelector('.file-item.selected .file-name')?.getAttribute('title')).toBe(firstPath);
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({ type: 'getFileDiff', payload: { hash: 'h1', file: firstPath } });
+    await fireEvent.click(container.querySelector('.file-item.selected')!);
+    await fireEvent.click(getByRole('button', { name: 'Commit' }));
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+
+    await rerender({ commit: commit({ hash: 'h2' }) });
+    deliverCommitDiff('h2', files);
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    expect(container.querySelector('.file-item.selected .file-name')?.getAttribute('title')).toBe(firstPath);
+  });
+
+  it('auto-expands matching parent chains and restores collapsed folders when cleared', async () => {
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    deliverCommitDiff('h1', files);
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    await fireEvent.click(container.querySelector('.dir-item')!);
+    expect(container.querySelector('[title="src/deep/z.ts"]')).toBeNull();
+    const input = getByRole('textbox', { name: 'Filter files…' });
+    await fireEvent.input(input, { target: { value: '  SRC/DEEP  ' } });
+    expect(Array.from(container.querySelectorAll('.file-name'), el => el.getAttribute('title'))).toEqual(['src/deep/z.ts']);
+    expect(container.querySelector('.dir-name')?.getAttribute('title')).toBe('src/deep');
+    expect(container.querySelector('.dir-item .codicon-chevron-down')).not.toBeNull();
+    await fireEvent.click(container.querySelector('.dir-item')!);
+    expect(container.querySelector('[title="src/deep/z.ts"]')).not.toBeNull();
+    await fireEvent.click(getByRole('button', { name: 'Clear file filter' }));
+    expect(container.querySelector('[title="src/deep/z.ts"]')).toBeNull();
+    expect(container.querySelector('.dir-item .codicon-chevron-right')).not.toBeNull();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it.each(['tree', 'list'] as const)('hides and restores the selected preview without selecting filtered matches in %s mode', async (mode) => {
+    uiStore.fileListMode = mode;
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    deliverCommitDiff('h1', files);
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    const selected = container.querySelector('.file-item.selected .file-name')!.getAttribute('title')!;
+    deliverFileDiff('h1', selected, { file: selected, isBinary: false, isImage: false, hunks: [] });
+    await waitFor(() => expect(container.querySelector('.diff-toolbar')).not.toBeNull());
+    globalThis.__postedMessages = [];
+    const input = getByRole('textbox', { name: 'Filter files…' });
+    await fireEvent.input(input, { target: { value: 'OTHER.TS' } });
+    expect(container.querySelectorAll('.file-item')).toHaveLength(1);
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+    expect(container.querySelector('.diff-toolbar')).toBeNull();
+    expect(container.querySelector('.file-preview-empty')).not.toBeNull();
+    expect(uiStore.commitFileSelected).toBe(true);
+    await fireEvent.input(input, { target: { value: 'missing' } });
+    expect(container.querySelectorAll('.file-item')).toHaveLength(0);
+    expect(container.querySelector('.empty-state-text')?.textContent).toBe('No matching files');
+    expect(container.querySelector('.file-search.no-results')).not.toBeNull();
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    expect(container.querySelector('.file-item.selected .file-name')?.getAttribute('title')).toBe(selected);
+    expect(container.querySelector('.diff-toolbar')).not.toBeNull();
+    expect(container.querySelector('.file-search.no-results')).toBeNull();
+    expect(globalThis.__postedMessages).toEqual([]);
+    await fireEvent.click(container.querySelector('.file-item.selected')!);
+    await fireEvent.input(input, { target: { value: 'OTHER.TS' } });
+    await fireEvent.click(getByRole('button', { name: 'Clear file filter' }));
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+    expect(container.querySelector('.file-preview-empty')).not.toBeNull();
+  });
+
+  it('toggles full-path list ordering and persists both layouts without changing selection', async () => {
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
+    deliverCommitDiff('h1', files);
+    await fireEvent.click(getByRole('button', { name: /Changes/ }));
+    globalThis.__postedMessages = [];
+    await fireEvent.click(getByRole('button', { name: 'Switch to list view' }));
+    expect(uiStore.fileListMode).toBe('list');
+    expect(container.querySelectorAll('.dir-item')).toHaveLength(0);
+    expect(Array.from(container.querySelectorAll('.file-name'), el => el.textContent)).toEqual(['a.ts', 'src/deep/z.ts', 'src/other.ts']);
+    expect(container.querySelector('.file-item.selected .file-name')?.textContent).toBe('src/deep/z.ts');
+    await fireEvent.click(getByRole('button', { name: 'Switch to tree view' }));
+    expect(uiStore.fileListMode).toBe('tree');
+    expect(container.querySelector('.dir-item')).not.toBeNull();
+    expect(container.querySelector('.file-item.selected .file-name')?.textContent).toBe('z.ts');
+    expect(globalThis.__postedMessages.map(m => m.data)).toEqual([
+      { type: 'saveFileListMode', payload: { mode: 'list' } },
+      { type: 'saveFileListMode', payload: { mode: 'tree' } },
+    ]);
+  });
+
+  it('keeps staged and unstaged requests distinct when filtering the same path', async () => {
+    const { container, getByRole } = render(CommitDetails, { commit: commit({ hash: 'UNCOMMITTED' }) });
+    deliverUncommittedDiff([{ path: 'src/a.ts', status: 'M' }], [{ path: 'src/a.ts', status: 'M' }]);
+    await waitFor(() => expect(container.querySelector('.file-item.selected')).not.toBeNull());
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({ type: 'getUncommittedFileDiff', payload: { file: 'src/a.ts', staged: true } });
+    globalThis.__postedMessages = [];
+    await fireEvent.input(getByRole('textbox'), { target: { value: 'SRC/A' } });
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
+    await fireEvent.click(getByRole('button', { name: /Unstaged/ }));
+    expect(container.querySelector('.file-item.selected')).toBeNull();
+    expect(globalThis.__postedMessages).toEqual([]);
+    await fireEvent.click(container.querySelector('.file-item')!);
+    expect(globalThis.__postedMessages.map(m => m.data)).toEqual([{ type: 'getUncommittedFileDiff', payload: { file: 'src/a.ts', staged: false } }]);
+    await fireEvent.input(getByRole('textbox'), { target: { value: 'missing' } });
+    expect(container.querySelector('.empty-state-text')?.textContent).toBe('No matching files');
+    expect(container.querySelector('.file-preview-empty')).not.toBeNull();
+    await fireEvent.click(getByRole('button', { name: 'Clear file filter' }));
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
+    expect(globalThis.__postedMessages).toHaveLength(1);
+  });
+
+  it('selects an initial nested repository without requesting an unsupported diff', async () => {
+    const { container } = render(CommitDetails, { commit: commit({ hash: 'UNCOMMITTED' }) });
+    deliverUncommittedDiff([{ path: 'nested', status: 'N' }], []);
+    await waitFor(() => expect(container.querySelector('.file-item.selected')).not.toBeNull());
+    expect(container.querySelector('.diff-empty')).not.toBeNull();
+    expect(globalThis.__postedMessages.map(m => m.data)).not.toContainEqual(expect.objectContaining({ type: 'getUncommittedFileDiff' }));
   });
 });
 
@@ -506,6 +654,9 @@ describe('CommitDetails — file tree & diff', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => container.querySelector('.file-item'));
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
+    globalThis.__postedMessages = [];
     await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
     // After clicking, a fileDiff request is posted
     expect(globalThis.__postedMessages.some(
@@ -520,10 +671,10 @@ describe('CommitDetails — file tree & diff', () => {
         { type: 'add', content: 'x', newLineNumber: 1 },
       ] }],
     });
-    await waitFor(() => container.querySelector('.diff-toolbar'));
+    await waitFor(() => expect(container.querySelector('.diff-toolbar')).not.toBeNull());
   });
 
-  it('clicking a file twice deselects it', async () => {
+  it('clicking the initially selected file deselects it', async () => {
     const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
     deliverCommitDiff('h1', [{ path: 'a.ts', status: 'M' }]);
     const changesTab = Array.from(container.querySelectorAll<HTMLButtonElement>('.top-tab'))
@@ -531,7 +682,6 @@ describe('CommitDetails — file tree & diff', () => {
     await fireEvent.click(changesTab);
     await waitFor(() => container.querySelector('.file-item'));
     const fileBtn = container.querySelector<HTMLButtonElement>('.file-item')!;
-    await fireEvent.click(fileBtn);
     expect(fileBtn.classList.contains('selected')).toBe(true);
     await fireEvent.click(fileBtn);
     expect(fileBtn.classList.contains('selected')).toBe(false);
@@ -596,7 +746,7 @@ describe('CommitDetails — diff mode toggle', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => r.container.querySelector('.file-item'));
-    await fireEvent.click(r.container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(r.container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', 'a.ts', {
       file: 'a.ts', isBinary: false, isImage: false,
       hunks: [{ header: '', oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [
@@ -631,7 +781,7 @@ describe('CommitDetails — diff mode toggle', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => container.querySelector('.file-item'));
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', 'data.bin', { file: 'data.bin', isBinary: true, isImage: false, hunks: [] });
     await waitFor(() => container.querySelector('.diff-empty'));
   });
@@ -643,7 +793,7 @@ describe('CommitDetails — diff mode toggle', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => container.querySelector('.file-item'));
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', 'logo.png', { file: 'logo.png', isBinary: true, isImage: true, hunks: [] });
     await waitFor(() => {
       // ImageDiff has its own toolbar with Side by Side / Swipe / Onion Skin
@@ -917,7 +1067,7 @@ describe('CommitDetails — multi-commit sections (3+ mode)', () => {
   it('renders per-commit sections for a file in 3+ multi-select mode', async () => {
     uiStore.comparing = true;
     uiStore.selectedCommitHashes = ['c3', 'c2', 'c1'];
-    const { findByText, getByText } = render(CommitDetails);
+    const { container, getByText } = render(CommitDetails);
     window.dispatchEvent(new MessageEvent('message', { data: {
       type: 'multiCommitSectionsData',
       payload: {
@@ -928,8 +1078,7 @@ describe('CommitDetails — multi-commit sections (3+ mode)', () => {
         ],
       },
     }}));
-    const fileEl = await findByText('a.txt');
-    await fireEvent.click(fileEl.closest('button')!);
+    await waitFor(() => expect(container.querySelector('.file-item.selected .file-name')?.textContent).toBe('a.txt'));
     // two section headers with short hashes
     await waitFor(() => {
       expect(getByText(/c3aaaaa/)).toBeTruthy();
@@ -1060,7 +1209,6 @@ describe('CommitDetails — folder selection highlight', () => {
     const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
     deliverCommitDiff('h1', [{ path: 'src/sub/only.ts', status: 'M' }]);
     await openChanges(container);
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
     // The file itself is selected …
     expect(container.querySelector('.file-item')!.classList.contains('selected')).toBe(true);
     // … but no expanded folder above it should be highlighted.
@@ -1073,7 +1221,6 @@ describe('CommitDetails — folder selection highlight', () => {
     const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
     deliverCommitDiff('h1', [{ path: 'src/sub/only.ts', status: 'M' }]);
     await openChanges(container);
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
     // Collapse the innermost folder (src/sub); its only file stays selected.
     const dirs = Array.from(container.querySelectorAll<HTMLButtonElement>('.dir-item'));
     await fireEvent.click(dirs[dirs.length - 1]);
@@ -1090,8 +1237,7 @@ describe('CommitDetails — Esc-driven file deselection', () => {
     const changesTab = Array.from(container.querySelectorAll<HTMLButtonElement>('.top-tab'))
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
-    await waitFor(() => container.querySelector('.file-item'));
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
+    await waitFor(() => expect(container.querySelector('.file-item.selected')).not.toBeNull());
   }
 
   it('selecting a file sets uiStore.commitFileSelected', async () => {
@@ -1412,7 +1558,7 @@ describe('CommitDetails — side-by-side scroll sync', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => container.querySelector('.file-item'));
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', 'a.ts', {
       file: 'a.ts', isBinary: false, isImage: false,
       hunks: [{ header: '', oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: [
@@ -1468,7 +1614,7 @@ describe('CommitDetails — large diff render cap', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => r.container.querySelector('.file-item'));
-    await fireEvent.click(r.container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(r.container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', diff.file, diff);
     await waitFor(() => r.container.querySelector('.diff-toolbar'));
     return r;
@@ -1585,7 +1731,7 @@ describe('CommitDetails — reverse changes (committed view)', () => {
       .find(t => /change/i.test(t.textContent ?? ''))!;
     await fireEvent.click(changesTab);
     await waitFor(() => r.container.querySelector('.file-item'));
-    await fireEvent.click(r.container.querySelector<HTMLButtonElement>('.file-item')!);
+    expect(r.container.querySelector('.file-item.selected')).not.toBeNull();
     deliverFileDiff('h1', 'src/a.ts', reversibleDiff());
     await waitFor(() => r.container.querySelector('.diff-content .diff-line'));
     globalThis.__postedMessages = [];

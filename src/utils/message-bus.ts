@@ -35,6 +35,8 @@ export interface ModalDefaults {
 export type WebviewMessage =
   | { type: 'getSettings' }
   | { type: 'setCommitDetailsPosition'; payload: { position: 'bottom' | 'right' } }
+  | { type: 'getFileListMode' }
+  | { type: 'saveFileListMode'; payload: { mode: 'tree' | 'list' } }
   | { type: 'getDiffMode' }
   | { type: 'saveDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'getAuthorColors' }
@@ -179,6 +181,7 @@ export type ExtensionMessage =
   | { type: 'setLocale'; payload: { locale: string; homeDir?: string } }
   | { type: 'setInteractiveRebaseMode'; payload: { mode: 'ui' | 'classic' } }
   | { type: 'setDefaultCommitTab'; payload: { tab: 'details' | 'changes' } }
+  | { type: 'setFileListMode'; payload: { mode: 'tree' | 'list' } }
   | { type: 'setDiffMode'; payload: { mode: 'inline' | 'side-by-side' } }
   | { type: 'setDateTimeFormat'; payload: { format: string; relativeDateFallbackFormat: string } }
   | { type: 'setDefaults'; payload: ModalDefaults }

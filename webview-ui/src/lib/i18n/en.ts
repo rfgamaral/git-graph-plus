@@ -646,6 +646,12 @@ export const en: Record<string, string> = {
   'bisect.banner.reset': 'Reset',
 
   // File context menu
+  'file.filterPlaceholder': 'Filter files…',
+  'file.clearFilter': 'Clear file filter',
+  'file.switchToList': 'Switch to list view',
+  'file.switchToTree': 'Switch to tree view',
+  'file.noMatches': 'No matching files',
+  'file.selectToView': 'Select a file to view changes',
   'file.open': 'Open File',
   'file.openChanges': 'Open Changes',
   'file.revealInExplorer': 'Reveal in File Explorer',

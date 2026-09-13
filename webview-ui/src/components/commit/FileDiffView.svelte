@@ -592,6 +592,7 @@
   }
 
   .diff-toolbar-row {
+    min-height: 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;

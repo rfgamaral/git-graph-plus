@@ -854,3 +854,42 @@ describe('MainPanel author colors', () => {
     expect(postedOfType('authorColor')).toHaveLength(0);
   });
 });
+
+describe('MainPanel file list preference', () => {
+  let values: Map<string, unknown>;
+  let update: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    values = new Map();
+    update = vi.fn(async (key: string, value: unknown) => { values.set(key, value); });
+    MainPanel.setGlobalState({
+      keys: () => [...values.keys()],
+      get: <T>(key: string, fallback?: T) => values.has(key) ? values.get(key) as T : fallback,
+      update,
+    } as import('vscode').Memento);
+  });
+
+  afterEach(() => values.clear());
+
+  it.each([undefined, 'invalid', false])('defaults to tree for saved value %s', async (saved) => {
+    values.set('fileListMode', saved);
+    await dispatch({ type: 'getFileListMode' });
+    expect(postedOfType('setFileListMode').at(-1)?.payload).toEqual({ mode: 'tree' });
+  });
+
+  it.each(['tree', 'list'])('remembers %s after reopening in another repository', async (mode) => {
+    await dispatch({ type: 'saveFileListMode', payload: { mode } });
+    expect(update).toHaveBeenCalledWith('fileListMode', mode);
+    (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    MainPanel.createOrShow(extUri, '/another-repo');
+    await dispatch({ type: 'getFileListMode' });
+    expect(postedOfType('setFileListMode').at(-1)?.payload).toEqual({ mode });
+  });
+
+  it.each(['invalid', null, true])('rejects invalid mode %s without overwriting the preference', async (mode) => {
+    values.set('fileListMode', 'list');
+    await dispatch({ type: 'saveFileListMode', payload: { mode } });
+    expect(update).not.toHaveBeenCalled();
+    expect(values.get('fileListMode')).toBe('list');
+  });
+});

@@ -256,6 +256,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
           resizeCleanup?.();
           uiStore.commitDetailsPosition = msg.payload.position;
           break;
+        case 'setFileListMode':
+          uiStore.fileListMode = msg.payload.mode === 'list' ? 'list' : 'tree';
+          break;
         case 'setDiffMode':
           uiStore.diffMode = msg.payload.mode;
           break;
@@ -405,6 +408,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
     vscode.postMessage({ type: 'getRepoList' });
     vscode.postMessage({ type: 'checkFlowStatus' });
     vscode.postMessage({ type: 'getAuthorColors' });
+    vscode.postMessage({ type: 'getFileListMode' });
     vscode.postMessage({ type: 'getDiffMode' });
 
     // Refresh conflict status when webview becomes visible

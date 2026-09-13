@@ -23,6 +23,7 @@ function resetStores() {
   branchStore.stashes = [];
   branchStore.worktrees = [];
   uiStore.viewMode = 'graph';
+  uiStore.fileListMode = 'tree';
   uiStore.selectCommit(null);
   uiStore.alwaysShowCommitDetails = false;
   uiStore.commitDetailsPosition = 'bottom';
@@ -64,6 +65,7 @@ describe('App — initial requests', () => {
       expect(types).toContain('getLog');
       expect(types).toContain('getBranches');
       expect(types).toContain('checkFlowStatus');
+      expect(types).toContain('getFileListMode');
     });
   });
 });
@@ -101,6 +103,17 @@ describe('App — startup settings delivery', () => {
 });
 
 describe('App — message handling', () => {
+  it.each([
+    { mode: 'list', expected: 'list' },
+    { mode: 'tree', expected: 'tree' },
+    { mode: 'invalid', expected: 'tree' },
+  ])('restores file list mode $mode as $expected', async ({ mode, expected }) => {
+    render(App);
+    uiStore.fileListMode = 'list';
+    postMsg('setFileListMode', { mode });
+    await waitFor(() => expect(uiStore.fileListMode).toBe(expected));
+  });
+
   it('logData updates commitStore via setData', async () => {
     render(App);
     postMsg('logData', { commits: [], graph: [], hasMore: false, currentLimit: 100 });

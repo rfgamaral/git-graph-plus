@@ -29,6 +29,7 @@ class UiStore {
   }
 
   defaultCommitTab = $state<'details' | 'changes'>('details');
+  fileListMode = $state<'tree' | 'list'>('tree');
   diffMode = $state<'inline' | 'side-by-side'>('inline');
   dateTimeFormat = $state('DD.MM.YYYY HH:mm:ss');
   relativeDateFallbackFormat = $state('DD.MM.YYYY');
