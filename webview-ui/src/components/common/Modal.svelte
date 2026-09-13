@@ -13,14 +13,10 @@
 
   let { title, onClose, children, width }: Props = $props();
   let dialogEl: HTMLDivElement | undefined = $state();
-  let ready = $state(false);
 
   onMount(() => {
     // Focus trap
     dialogEl?.focus();
-
-    // Delay enabling overlay click-to-close to prevent the opening click from immediately closing the modal
-    requestAnimationFrame(() => { ready = true; });
 
     let closed = false;
     function handleEscape(e: KeyboardEvent) {
@@ -29,10 +25,6 @@
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   });
-
-  function handleOverlayClick() {
-    if (ready) { onClose(); }
-  }
 
   // Fallback Enter handler: if focus is still on the dialog (e.g. the primary button
   // was disabled at mount while conflict prediction loaded), Enter would otherwise
@@ -50,9 +42,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<!-- svelte-ignore a11y_interactive_supports_focus -->
-<div class="modal-overlay" onclick={handleOverlayClick} onkeydown={() => {}} role="dialog" tabindex={-1}>
+<div class="modal-overlay" role="dialog" tabindex={-1}>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div

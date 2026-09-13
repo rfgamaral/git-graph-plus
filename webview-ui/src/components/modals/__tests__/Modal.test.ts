@@ -30,7 +30,7 @@ describe('Modal (close behavior, exercised via CreateBranchModal)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('clicks inside the dialog do NOT bubble to the overlay close handler', async () => {
+  it('clicks inside the dialog do not close it', async () => {
     const onClose = vi.fn();
     const { container } = render(CreateBranchModal, { startPoint: 'main', onClose, onCreate: vi.fn() });
     const dialog = container.querySelector<HTMLDivElement>('.modal');
@@ -44,14 +44,13 @@ describe('Modal (close behavior, exercised via CreateBranchModal)', () => {
     expect(title?.textContent?.trim().length).toBeGreaterThan(0);
   });
 
-  it('clicking the overlay (outside the dialog) triggers onClose after rAF', async () => {
+  it('clicking the overlay (outside the dialog) does not close it', async () => {
     const onClose = vi.fn();
     const { container } = render(CreateBranchModal, { startPoint: 'main', onClose, onCreate: vi.fn() });
-    // ready flag is set on the next animation frame
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const overlay = container.querySelector<HTMLDivElement>('.modal-overlay')!;
     await fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('Enter on the dialog clicks the first non-disabled .primary button', async () => {
