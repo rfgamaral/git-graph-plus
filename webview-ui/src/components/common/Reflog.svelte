@@ -51,6 +51,7 @@
   // ── 필터 ────────────────────────────────────────────────
   let refOpen          = $state(false);
   let actionOpen       = $state(false);
+  let viewMenu         = $state<{ x: number; y: number } | null>(null);
   let selectedRef      = $state(saved.selectedRef);
   let activeActions    = $state<Set<string>>(new Set(saved.activeActions));
   let danglingOnly     = $state<boolean>(saved.danglingOnly);
@@ -171,12 +172,23 @@
       }
     }
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener('keydown', onWindowKeydown, true);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('keydown', onWindowKeydown, true);
+    };
   });
 
   function clearSearch() {
     query = '';
     inputEl?.focus();
+  }
+
+  function onWindowKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || !viewMenu) return;
+    viewMenu = null;
+    event.stopImmediatePropagation();
+    event.preventDefault();
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -220,7 +232,7 @@
 <!-- ── 검색바 + 필터 ──────────────────────────────────── -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="search-bar" role="group" onkeydown={handleKeydown}>
-  <div class="search-row" class:no-results={query && filteredEntries.length === 0 && entries.length > 0}>
+  <div class="search-row" class:no-results={query.trim() && filteredEntries.length === 0 && entries.length > 0}>
     <i class="codicon codicon-search search-icon"></i>
     <input
       class="search-input"
@@ -229,21 +241,19 @@
       bind:value={query}
       placeholder={t('reflog.searchPlaceholder')}
     />
-    {#if query || actionActive || danglingOnly}
+    {#if query.trim()}
       <span class="search-count" class:empty={filteredEntries.length === 0}>
         {#if filteredEntries.length === 0}
           {t('search.noResults')}
-        {:else if query}
-          {t('reflog.matchCount', { n: filteredEntries.length })}
         {:else}
-          {filteredEntries.length} / {entries.length}
+          {t('reflog.matchCount', { n: filteredEntries.length })}
         {/if}
       </span>
-      {#if query}
-        <button class="nav-btn close-btn" onclick={clearSearch} aria-label={t('search.clear')} use:tooltip={t('search.clear')}>
-          <i class="codicon codicon-close"></i>
-        </button>
-      {/if}
+    {/if}
+    {#if query}
+      <button class="nav-btn close-btn" onclick={clearSearch} aria-label={t('search.clear')} use:tooltip={t('search.clear')}>
+        <i class="codicon codicon-close"></i>
+      </button>
     {/if}
   </div>
 
@@ -252,7 +262,7 @@
     <button
       class="filter-btn"
       class:active={refActive}
-      onclick={() => { refOpen = !refOpen; actionOpen = false; }}
+      onclick={() => { refOpen = !refOpen; actionOpen = false; viewMenu = null; }}
       use:tooltip={t('reflog.filterRef')}
     >
       <i class="codicon codicon-git-branch filter-btn-icon"></i>
@@ -284,7 +294,7 @@
     <button
       class="filter-btn"
       class:active={actionActive}
-      onclick={() => { actionOpen = !actionOpen; refOpen = false; }}
+      onclick={() => { actionOpen = !actionOpen; refOpen = false; viewMenu = null; }}
       use:tooltip={t('reflog.filterAction')}
     >
       <i class="codicon codicon-list-filter filter-btn-icon"></i>
@@ -317,15 +327,21 @@
     {/if}
   </div>
 
-  <!-- 잃어버린 커밋 토글 -->
   <button
-    class="toggle-btn"
-    class:active={danglingOnly}
-    onclick={() => { danglingOnly = !danglingOnly; }}
-    aria-label={t('reflog.filterDanglingOnly')}
-    use:tooltip={t('reflog.filterDanglingOnly')}
+    class="view-btn"
+    onclick={(event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      viewMenu = viewMenu ? null : { x: rect.left, y: rect.bottom + 4 };
+      refOpen = false;
+      actionOpen = false;
+    }}
+    aria-label={t('toolbar.view')}
+    aria-haspopup="menu"
+    aria-expanded={viewMenu !== null}
   >
-    <i class="codicon codicon-warning"></i>
+    <i class="codicon codicon-settings filter-btn-icon"></i>
+    <span class="filter-label">{t('toolbar.view')}</span>
+    <i class="codicon codicon-chevron-down chevron"></i>
   </button>
 </div>
 
@@ -399,6 +415,19 @@
 </div>
 
 <!-- ── 모달 / 컨텍스트 메뉴 ──────────────────────────── -->
+{#if viewMenu}
+  <div class="view-menu">
+    <ContextMenu
+      x={viewMenu.x}
+      y={viewMenu.y}
+      items={[
+        { label: t('reflog.filterDanglingOnly'), checked: danglingOnly, action: () => { danglingOnly = !danglingOnly; } },
+      ]}
+      onClose={() => { viewMenu = null; }}
+    />
+  </div>
+{/if}
+
 {#if contextMenu}
   <ContextMenu
     x={contextMenu.x}
@@ -539,7 +568,7 @@
     flex-shrink: 0;
   }
 
-  .filter-btn {
+  .filter-btn, .view-btn {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -557,7 +586,7 @@
     max-width: 130px;
   }
 
-  .filter-btn:hover {
+  .filter-btn:hover, .view-btn:hover {
     color: var(--text-primary);
     border-color: var(--vscode-focusBorder, #007fd4);
   }
@@ -595,41 +624,16 @@
 
   .chevron { font-size: 14px; opacity: 0.7; flex-shrink: 0; }
 
-  .filter-btn:hover .chevron {
+  .filter-btn:hover .chevron, .view-btn:hover .chevron {
     opacity: 1;
   }
 
-  .toggle-btn .codicon, .nav-btn .codicon {
+  .nav-btn .codicon {
     font-size: 14px;
   }
 
-  /* ── 잃어버린 커밋 토글 버튼 ────────────────────────── */
-  .toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    background: transparent;
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 14px;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition: color 0.1s, border-color 0.1s, background 0.1s;
-  }
-
-  .toggle-btn:hover {
-    color: var(--vscode-editorWarning-foreground, #ff9800);
-    border-color: var(--vscode-editorWarning-foreground, #ff9800);
-  }
-
-  .toggle-btn.active {
-    color: var(--vscode-editorWarning-foreground, #ff9800);
-    border-color: var(--vscode-editorWarning-foreground, #ff9800);
-    background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #ff9800) 12%, transparent);
+  .view-menu :global(.context-menu) {
+    min-width: 140px;
   }
 
   /* ── 드롭다운 ───────────────────────────────────────── */

@@ -334,7 +334,7 @@ export const en: Record<string, string> = {
   'reflog.filterRef': 'Reference',
   'reflog.filterAction': 'Action',
   'reflog.filterAll': 'All',
-  'reflog.filterDanglingOnly': 'Dangling commits only',
+  'reflog.filterDanglingOnly': 'Show only lost commits',
   'reflog.loadMore': 'Load more entries',
   'reflog.amend': 'amend',
   'reflog.timeSecond': '{n}s ago',

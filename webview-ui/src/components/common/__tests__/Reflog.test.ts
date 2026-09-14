@@ -183,17 +183,53 @@ describe('Reflog — search and filter', () => {
     });
   });
 
-  it('dangling-only toggle filters non-dangling entries', async () => {
-    const { container } = render(Reflog, { active: true });
+  it('View menu toggles lost commits and reflects its checked state', async () => {
+    const { container, getByRole } = render(Reflog, { active: true });
     deliverReflog([
       entry({ selector: 'HEAD@{0}', message: 'commit: a' }),
       entry({ selector: 'HEAD@{1}', message: 'commit: b', dangling: true }),
     ]);
     await waitFor(() => container.querySelectorAll('.reflog-row').length === 2);
-    await fireEvent.click(container.querySelector<HTMLButtonElement>('.toggle-btn')!);
-    await waitFor(() => {
-      expect(container.querySelectorAll('.reflog-row').length).toBe(1);
-    });
+    await fireEvent.click(getByRole('button', { name: 'View' }));
+    const option = getByRole('menuitemcheckbox', { name: 'Show only lost commits' });
+    expect(option.getAttribute('aria-checked')).toBe('false');
+    await fireEvent.click(option);
+    expect(container.querySelectorAll('.reflog-row')).toHaveLength(1);
+    expect(container.querySelector('.search-count')).toBeNull();
+    await fireEvent.click(getByRole('button', { name: 'View' }));
+    const checked = getByRole('menuitemcheckbox', { name: 'Show only lost commits' });
+    expect(checked.getAttribute('aria-checked')).toBe('true');
+    await fireEvent.click(checked);
+    expect(container.querySelectorAll('.reflog-row')).toHaveLength(2);
+  });
+
+  it.each(['', '   '])('keeps search neutral for an empty lost-commits view with query %j', async (query) => {
+    const { container, getByRole } = render(Reflog, { active: true });
+    deliverReflog([entry()]);
+    const search = container.querySelector<HTMLInputElement>('.search-input')!;
+    await fireEvent.input(search, { target: { value: query } });
+    await fireEvent.click(getByRole('button', { name: 'View' }));
+    await fireEvent.click(getByRole('menuitemcheckbox', { name: 'Show only lost commits' }));
+    expect(container.querySelectorAll('.reflog-row')).toHaveLength(0);
+    expect(container.querySelector('.reflog-empty')).not.toBeNull();
+    expect(container.querySelector('.search-count')).toBeNull();
+    expect(container.querySelector('.search-row')?.classList.contains('no-results')).toBe(false);
+    await fireEvent.input(search, { target: { value: 'commit' } });
+    expect(container.querySelector('.search-count')?.textContent?.trim()).toBe('No results');
+    expect(container.querySelector('.search-row')?.classList.contains('no-results')).toBe(true);
+    await fireEvent.click(getByRole('button', { name: 'Clear' }));
+    expect(container.querySelector('.search-count')).toBeNull();
+    expect(container.querySelectorAll('.reflog-row')).toHaveLength(0);
+  });
+
+  it('Escape closes View without clearing the query', async () => {
+    const { container, getByRole, queryByRole } = render(Reflog, { active: true });
+    const search = container.querySelector<HTMLInputElement>('.search-input')!;
+    await fireEvent.input(search, { target: { value: 'commit' } });
+    await fireEvent.click(getByRole('button', { name: 'View' }));
+    await fireEvent.keyDown(search, { key: 'Escape' });
+    expect(queryByRole('menu')).toBeNull();
+    expect(search.value).toBe('commit');
   });
 
   it('ref dropdown lists HEAD and local branches; switching posts a new request', async () => {
