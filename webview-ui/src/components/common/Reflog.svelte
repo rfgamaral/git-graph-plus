@@ -355,7 +355,7 @@
     </div>
   {:else}
     <div class="reflog-list" role="list" use:rememberScroll={{ key: 'reflog', ready: !loading }}>
-      <div class="reflog-header">
+      <div class="reflog-header" data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}>
         <div class="col-idx">#</div>
         <div class="col-action">{t('reflog.action')}</div>
         <div class="col-subaction">{t('reflog.subAction')}</div>
@@ -385,8 +385,6 @@
               <span class="sub-action-tag {action.subType}">
                 {action.subType === 'amend' ? t('reflog.amend') : action.subType}
               </span>
-            {:else}
-              <span class="sub-action-none">-</span>
             {/if}
           </div>
           <div class="col-description">
@@ -458,26 +456,28 @@
 
   /* ── 검색바 ─────────────────────────────────────────── */
   .search-bar {
-    padding: 5px 14px;
+    height: var(--pane-toolbar-height);
+    padding: 5px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     position: relative;
   }
 
   .search-row {
     flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 4px;
     background: var(--input-bg);
     border: 1px solid var(--input-border, var(--border-color));
-    border-radius: 6px;
-    padding: 0 8px;
-    height: 30px;
+    border-radius: 4px;
+    padding: 0 6px;
+    height: 26px;
     transition: border-color 0.15s;
   }
 
@@ -498,14 +498,15 @@
 
   .search-row:focus-within .search-icon {
     opacity: 1;
-    color: var(--vscode-focusBorder, #007fd4);
   }
 
   .search-input {
     flex: 1;
+    height: 16px;
+    line-height: 16px;
     padding: 0 2px;
     background: transparent;
-    color: var(--input-fg);
+    color: var(--text-secondary);
     border: none;
     font-size: inherit;
     font-family: inherit;
@@ -513,10 +514,15 @@
     min-width: 0;
   }
 
+  .search-input::placeholder {
+    opacity: 0.8;
+  }
+
   .search-count {
     font-size: 11px;
     color: var(--text-secondary);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   .search-count.empty {
@@ -538,7 +544,7 @@
     transition: background 0.1s;
   }
 
-  .close-btn:hover {
+  .close-btn:hover:not(:disabled) {
     background: rgba(244, 67, 54, 0.15);
     color: #f44336;
   }
@@ -553,12 +559,12 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    height: 30px;
-    padding: 0 8px;
+    height: 26px;
+    padding: 0 6px;
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: inherit;
     font-family: inherit;
     cursor: pointer;
@@ -577,10 +583,11 @@
     border-color: var(--vscode-focusBorder, #007fd4);
   }
 
-  .filter-btn-icon { font-size: 13px; flex-shrink: 0; }
+  .filter-btn-icon { font-size: 14px; flex-shrink: 0; }
 
   .filter-label {
     flex: 1;
+    line-height: 16px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -602,20 +609,28 @@
     flex-shrink: 0;
   }
 
-  .chevron { font-size: 12px; opacity: 0.7; flex-shrink: 0; }
+  .chevron { font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+
+  .filter-btn:hover .chevron {
+    opacity: 1;
+  }
+
+  .toggle-btn .codicon, .nav-btn .codicon {
+    font-size: 14px;
+  }
 
   /* ── 잃어버린 커밋 토글 버튼 ────────────────────────── */
   .toggle-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     background: transparent;
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: 14px;
     flex-shrink: 0;
     cursor: pointer;
@@ -648,7 +663,7 @@
     border: 1px solid var(--vscode-menu-border, #454545);
     border-radius: 6px;
     padding: 4px;
-    min-width: 190px;
+    min-width: 160px;
     z-index: 100;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
@@ -678,11 +693,6 @@
   }
 
   .dd-item.active { color: var(--text-primary); }
-
-  .dd-ref-name {
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 12px;
-  }
 
   .dd-radio {
     width: 14px;
@@ -768,13 +778,13 @@
 
   /* ── 헤더 ───────────────────────────────────────────── */
   .reflog-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    height: 32px;
+    height: 30px;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-secondary);
-    flex-shrink: 0;
-    text-transform: uppercase;
     color: var(--text-secondary);
     font-size: 0.9em;
     font-weight: 600;
@@ -787,16 +797,20 @@
   /* ── 행 ─────────────────────────────────────────────── */
   .reflog-list {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    display: grid;
+    grid-template-columns: max-content max-content max-content minmax(0, 1fr) max-content max-content;
+    align-content: start;
+    overflow: auto;
     position: relative;
   }
 
   .reflog-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    height: 28px;
-    border-bottom: 1px solid var(--border-color);
+    height: 30px;
+    font-size: inherit;
     position: relative;
     cursor: default;
     user-select: none;
@@ -828,15 +842,12 @@
     font-size: 1em;
     line-height: 1;
     flex-shrink: 0;
-    margin-right: 4px;
     transform: translateY(1px);
   }
 
   /* ── 컬럼 ───────────────────────────────────────────── */
   .col-idx {
-    width: 30px;
-    flex-shrink: 0;
-    padding: 0 10px 0 6px;
+    padding: 0 10px;
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: 1em;
     color: var(--text-secondary);
@@ -845,53 +856,47 @@
   }
 
   .col-action {
-    width: 120px;
-    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 5px 0 10px;
-    overflow: hidden;
+    gap: 5px;
+    padding: 0 10px;
+    white-space: nowrap;
   }
 
   .col-subaction {
-    width: 100px;
-    flex-shrink: 0;
     display: flex;
     align-items: center;
-    padding: 0 10px 0 5px;
-    overflow: hidden;
+    justify-content: center;
+    padding: 0 10px;
+    white-space: nowrap;
   }
 
   .col-description {
-    flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
+    gap: 5px;
     padding: 0 10px;
     overflow: hidden;
   }
 
   .col-hash {
-    width: 75px;
-    flex-shrink: 0;
     padding: 0 10px;
     font-family: var(--vscode-editor-font-family, monospace);
     color: var(--text-secondary);
-    /* Large repos abbreviate hashes to 10-12 chars; clip so they never spill
-       into the date column. */
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .reflog-header .col-idx {
+    text-align: center;
+  }
+
+  .reflog-header .col-idx,
   .reflog-header .col-hash {
     font-family: inherit;
   }
 
   .col-date {
-    width: 80px;
-    flex-shrink: 0;
     padding: 0 10px;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -976,12 +981,6 @@
     opacity: 1;
   }
 
-  .sub-action-none {
-    opacity: 0.4;
-    padding-left: 6px;
-    font-size: inherit;
-  }
-
   .reflog-msg {
     flex: 1;
     min-width: 0;
@@ -1007,6 +1006,7 @@
 
   /* ── 더보기 ─────────────────────────────────────────── */
   .load-more-row {
+    grid-column: 1 / -1;
     display: flex;
     justify-content: center;
     padding: 10px 0 12px;
