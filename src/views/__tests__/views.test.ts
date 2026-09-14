@@ -27,13 +27,6 @@ vi.mock('vscode', () => {
     EventEmitter,
     TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
     commands: { executeCommand: vi.fn() },
-    StatusBarAlignment: { Left: 1, Right: 2 },
-    l10n: { t: (s: string) => s },
-    window: {
-      createStatusBarItem: vi.fn(() => ({
-        text: '', command: '', tooltip: '', show: vi.fn(), dispose: vi.fn(),
-      })),
-    },
   };
 });
 
@@ -43,7 +36,6 @@ import { RemotesViewProvider } from '../remotes-view';
 import { TagsViewProvider } from '../tags-view';
 import { StashesViewProvider } from '../stashes-view';
 import { WorktreesViewProvider } from '../worktrees-view';
-import { StatusBarManager } from '../status-bar';
 import type { GitService } from '../../git/git-service';
 import type { BranchInfo, RemoteInfo, TagInfo, StashEntry, WorktreeInfo } from '../../git/types';
 
@@ -270,20 +262,5 @@ describe.each(lifecycleCases)('$name provider lifecycle', ({ make, data }) => {
     const svc = mockSvc();
     for (const m of DATA_METHODS) (svc[m] as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'));
     expect(await (make(svc) as Provider).getChildren()).toEqual([]);
-  });
-});
-
-describe('StatusBarManager', () => {
-  it('creates a right-aligned status item wired to the open command, and disposes it', () => {
-    const createFn = vscode.window.createStatusBarItem as unknown as ReturnType<typeof vi.fn>;
-    const mgr = new StatusBarManager();
-    expect(createFn).toHaveBeenCalledWith(2 /* Right */, 0);
-    const item = createFn.mock.results.at(-1)!.value;
-    expect(item.text).toBe('$(git-merge)');
-    expect(item.command).toBe('gitGraphPlus.open');
-    expect(item.tooltip).toBe('Git Graph+ - Click to open');
-    expect(item.show).toHaveBeenCalled();
-    mgr.dispose();
-    expect(item.dispose).toHaveBeenCalled();
   });
 });

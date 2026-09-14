@@ -72,7 +72,6 @@ vi.mock('../views/remotes-view', () => ({ RemotesViewProvider: class { refresh()
 vi.mock('../views/tags-view', () => ({ TagsViewProvider: class { refresh() {} dispose() {} setGitService() {} prefetch() { return Promise.resolve(); } } }));
 vi.mock('../views/stashes-view', () => ({ StashesViewProvider: class { refresh() {} dispose() {} setGitService() {} prefetch() { return Promise.resolve(); } } }));
 vi.mock('../views/worktrees-view', () => ({ WorktreesViewProvider: class { refresh() {} dispose() {} setGitService() {} prefetch() { return Promise.resolve(); } } }));
-vi.mock('../views/status-bar', () => ({ StatusBarManager: class { dispose() {} } }));
 vi.mock('../services/repo-discovery', () => ({ RepoDiscoveryService: { discoverRepos: vi.fn(async () => []), clearCache: vi.fn() } }));
 void viewStub;
 

@@ -168,7 +168,7 @@ to that operation. Requires Git 2.38 or later.
 3. Open Git Graph+ using any of:
    - **Command Palette** - `Git Graph+: Open`
    - **Activity Bar** - Click the Git Graph+ icon
-   - **SCM title bar**, **Status bar**, or **Editor title bar** - Click the git-merge icon
+   - **SCM title bar** or **Editor title bar** - Click the git-merge icon
 
 > [!Tip]
 > For the best experience, enable these VS Code settings:

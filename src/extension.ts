@@ -10,7 +10,6 @@ import { RemotesViewProvider } from './views/remotes-view';
 import { TagsViewProvider } from './views/tags-view';
 import { StashesViewProvider } from './views/stashes-view';
 import { WorktreesViewProvider } from './views/worktrees-view';
-import { StatusBarManager } from './views/status-bar';
 import { RepoDiscoveryService } from './services/repo-discovery';
 import { samePath } from './utils/path';
 import { resolveDefaultWorktreePath } from './utils/worktree-path';
@@ -45,10 +44,6 @@ export function activate(context: vscode.ExtensionContext) {
       MainPanel.revive(panel, context.extensionUri, repoPath);
     },
   }));
-  // Status bar is always visible regardless of workspace state
-  const statusBar = new StatusBarManager();
-  context.subscriptions.push(statusBar);
-
   // Persistent avatar cache lives under globalStorage so every window reuses
   // the same avatars instead of re-fetching from gravatar.com (issue #38).
   MainPanel.setAvatarCacheDir(vscode.Uri.joinPath(context.globalStorageUri, 'avatars').fsPath);
