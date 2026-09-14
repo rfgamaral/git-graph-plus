@@ -361,7 +361,7 @@ export const en: Record<string, string> = {
   'checkoutCommit.selectBranch': 'Branch',
   'checkoutCommit.checkoutBranch': 'Checkout {name}',
   'checkoutCommit.checkoutRemote': 'Checkout {name}',
-  'checkoutCommit.detachedWarning': 'No branch at this commit. You will be in detached HEAD state.',
+  'checkoutCommit.detachedWarning': 'You will be in detached HEAD state, not on a branch.',
 
   // Checkout and Fast-Forward modal
   'fastForward.title': 'Checkout and Fast-Forward',

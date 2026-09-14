@@ -3,6 +3,7 @@ import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import Reflog from '../Reflog.svelte';
 import { i18n } from '../../../lib/i18n/index.svelte';
 import { branchStore } from '../../../lib/stores/branches.svelte';
+import { defaultsStore } from '../../../lib/stores/defaults.svelte';
 
 interface ReflogEntry {
   hash: string;
@@ -33,6 +34,7 @@ function deliverReflog(entries: ReflogEntry[], hasMore = false) {
 
 beforeEach(() => {
   i18n.setLocale('en');
+  defaultsStore.set({});
   branchStore.branches = [];
   branchStore.remotes = [];
   branchStore.tags = [];
@@ -422,27 +424,26 @@ describe('Reflog — modal action callbacks', () => {
     )).toBe(false);
   });
 
-  it('CheckoutCommitModal confirm posts checkout', async () => {
+  it.each([true, false])('checks out the exact reflog hash with confirmation %s', async confirmDetached => {
+    defaultsStore.current.checkout.confirmDetached = confirmDetached;
     const { container } = render(Reflog, { active: true });
-    deliverReflog([entry({ hash: 'fullHash7' })]);
-    await waitFor(() => container.querySelector('.reflog-row'));
+    deliverReflog([entry({ hash: 'a'.repeat(40) })]);
+    await waitFor(() => expect(container.querySelector('.reflog-row')).not.toBeNull());
     await openContextMenuAndClick(container, /checkout/i);
-    await waitFor(() => document.querySelector('.modal'));
-    // CheckoutCommitModal fires checkDirty on mount; respond to it.
+    expect(!!document.querySelector('.modal')).toBe(confirmDetached);
     const posted = globalThis.__postedMessages.map(m => m.data) as Array<{ type: string; payload?: Record<string, unknown> }>;
     const dirtyReq = posted.find(p => p.type === 'checkDirty');
-    if (dirtyReq) {
-      window.dispatchEvent(new MessageEvent('message', {
-        data: { type: 'dirtyState', payload: { requestId: dirtyReq.payload!.requestId, dirty: false } },
-      }));
+    expect(dirtyReq).toBeDefined();
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'dirtyState', payload: { requestId: dirtyReq!.payload!.requestId, dirty: false } },
+    }));
+    if (confirmDetached) {
+      await fireEvent.click(document.querySelector<HTMLButtonElement>('.modal button.primary')!);
     }
-    await waitFor(() => document.querySelector('.modal button.primary'));
-    globalThis.__postedMessages = [];
-    await fireEvent.click(document.querySelector<HTMLButtonElement>('.modal button.primary')!);
-    const req = globalThis.__postedMessages.find(
-      (m) => (m.data as { type?: string }).type === 'checkout'
-    );
-    expect(req).toBeDefined();
+    await waitFor(() => expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'checkout', payload: { ref: 'a'.repeat(40), detach: true },
+    }));
+    defaultsStore.set({});
   });
 });
 

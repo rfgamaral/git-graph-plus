@@ -18,7 +18,7 @@ export interface ModalDefaults {
   merge: { mode: 'default' | 'no-ff' | 'squash'; pushAfter: boolean; deleteSource: boolean };
   rebase: { autostash: boolean; pushAfter: boolean };
   amend: { keepMessage: boolean; resetDate: boolean; resetAuthor: boolean; only: boolean; pushAfter: boolean };
-  checkout: { dirty: 'keep' | 'stash' | 'discard' };
+  checkout: { dirty: 'keep' | 'stash' | 'discard'; confirmDetached: boolean };
   checkoutRemote: { dirty: 'keep' | 'stash' | 'discard' };
   createBranch: { checkout: boolean; publish: boolean };
   createTag: { push: boolean };
@@ -47,7 +47,7 @@ export type WebviewMessage =
   | { type: 'getRepoList' }
   | { type: 'checkDirty'; payload?: { requestId?: string } }
   | { type: 'predictConflicts'; payload: { ours: string; theirs: string; mode?: 'rebase'; mergeBase?: string; requestId?: string } }
-  | { type: 'checkout'; payload: { ref: string; pullAfter?: boolean; force?: boolean; merge?: boolean; stash?: boolean; stashUntracked?: boolean; clean?: boolean } }
+  | { type: 'checkout'; payload: { ref: string; detach?: boolean; pullAfter?: boolean; force?: boolean; merge?: boolean; stash?: boolean; stashUntracked?: boolean; clean?: boolean } }
   | { type: 'getCommitDiff'; payload: { hash: string } }
   | { type: 'getFileDiff'; payload: { hash: string; file: string } }
   | { type: 'getCommitData'; payload: { hash: string } }

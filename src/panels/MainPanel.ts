@@ -139,7 +139,7 @@ export class MainPanel {
       merge: { mode: g('merge.mode', 'default'), pushAfter: g('merge.pushAfter', false), deleteSource: g('merge.deleteSource', false) },
       rebase: { autostash: g('rebase.autostash', false), pushAfter: g('rebase.pushAfter', false) },
       amend: { keepMessage: g('amend.keepMessage', true), resetDate: g('amend.resetDate', false), resetAuthor: g('amend.resetAuthor', false), only: g('amend.only', false), pushAfter: g('amend.pushAfter', false) },
-      checkout: { dirty: g('checkout.dirty', 'keep') },
+      checkout: { dirty: g('checkout.dirty', 'keep'), confirmDetached: g('checkout.confirmDetached', true) },
       checkoutRemote: { dirty: g('checkoutRemote.dirty', 'keep') },
       createBranch: { checkout: g('createBranch.checkout', true), publish: g('createBranch.publish', false) },
       createTag: { push: g('createTag.push', true) },
@@ -702,7 +702,7 @@ export class MainPanel {
           if (message.payload.clean) {
             await this.gitService.clean();
           }
-          await this.gitService.checkout(message.payload.ref, { force: message.payload.force, merge: message.payload.merge });
+          await this.gitService.checkout(message.payload.ref, { force: message.payload.force, merge: message.payload.merge, ...(message.payload.detach ? { detach: true } : {}) });
           if (message.payload.pullAfter) {
             await this.gitService.pull();
           }

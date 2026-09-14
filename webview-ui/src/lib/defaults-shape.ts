@@ -5,7 +5,7 @@ export interface ModalDefaults {
   merge: { mode: 'default' | 'no-ff' | 'squash'; pushAfter: boolean; deleteSource: boolean };
   rebase: { autostash: boolean; pushAfter: boolean };
   amend: { keepMessage: boolean; resetDate: boolean; resetAuthor: boolean; only: boolean; pushAfter: boolean };
-  checkout: { dirty: 'keep' | 'stash' | 'discard' };
+  checkout: { dirty: 'keep' | 'stash' | 'discard'; confirmDetached: boolean };
   checkoutRemote: { dirty: 'keep' | 'stash' | 'discard' };
   createBranch: { checkout: boolean; publish: boolean };
   createTag: { push: boolean };
@@ -25,7 +25,7 @@ export const DEFAULT_MODAL_DEFAULTS: ModalDefaults = {
   merge: { mode: 'default', pushAfter: false, deleteSource: false },
   rebase: { autostash: false, pushAfter: false },
   amend: { keepMessage: true, resetDate: false, resetAuthor: false, only: false, pushAfter: false },
-  checkout: { dirty: 'keep' },
+  checkout: { dirty: 'keep', confirmDetached: true },
   checkoutRemote: { dirty: 'keep' },
   createBranch: { checkout: true, publish: false },
   createTag: { push: true },

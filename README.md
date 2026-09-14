@@ -212,7 +212,7 @@ Preset the default options for each operation dialog under `gitGraphPlus.default
 | Merge           | `merge.mode`, `merge.pushAfter`, `merge.deleteSource`                                        |
 | Rebase          | `rebase.autostash`, `rebase.pushAfter`                                                       |
 | Amend           | `amend.keepMessage`, `amend.resetDate`, `amend.resetAuthor`, `amend.only`, `amend.pushAfter` |
-| Checkout        | `checkout.dirty`, `checkoutRemote.dirty`                                                     |
+| Checkout        | `checkout.confirmDetached`, `checkout.dirty`, `checkoutRemote.dirty`                                                     |
 | Create Branch   | `createBranch.checkout`, `createBranch.publish`                                              |
 | Create Tag      | `createTag.push`                                                                             |
 | Cherry-pick     | `cherryPick.noCommit`, `cherryPick.pushAfter`                                                |

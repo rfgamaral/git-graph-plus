@@ -252,9 +252,11 @@
   let pendingRebaseBase = $state<string | null>(null);
   let showCheckoutCommitModal = $state(false);
   let checkoutCommitHash = $state('');
+  let checkoutDetached = $state(false);
 
-  function openCheckoutCommitModal(hash: string) {
+  function openCheckoutCommitModal(hash: string, detached = false) {
     checkoutCommitHash = hash;
+    checkoutDetached = detached;
     showCheckoutCommitModal = true;
   }
 
@@ -668,7 +670,7 @@
       if (remoteRef) {
         doCheckoutRemote(`${remoteRef.remote}/${remoteRef.name}`, remoteRef.name);
       } else {
-        openCheckoutCommitModal(commit.hash);
+        openCheckoutCommitModal(commit.hash, true);
       }
     }
   }
@@ -1127,18 +1129,7 @@
       groups.push([
         {
           label: t('graph.checkoutCommit'),
-          action: () => {
-            const localRefs = commit.refs.filter(r => r.type === 'head' || r.type === 'branch');
-            if (localRefs.length === 1) {
-              doCheckout(localRefs[0].name);
-            } else if (localRefs.length > 1) {
-              openCheckoutCommitModal(commit.hash);
-            } else {
-              const remoteRef = commit.refs.find(r => r.type === 'remote-branch' && r.name !== 'HEAD');
-              if (remoteRef) { doCheckoutRemote(`${remoteRef.remote}/${remoteRef.name}`, remoteRef.name); }
-              else            { openCheckoutCommitModal(commit.hash); }
-            }
-          },
+          action: () => openCheckoutCommitModal(commit.hash, true),
         },
         { label: t('graph.cherryPickCommit'), action: () => { cherryPickTarget = commit.hash; showCherryPickModal = true; } },
         { label: t('graph.revertCommit'),     action: () => { revertTarget = commit.hash; showRevertModal = true; } },
@@ -1821,11 +1812,14 @@
   {@const linkedRemoteBranches = commitForHash ? commitForHash.refs.filter(r => r.type === 'remote-branch' && r.name !== 'HEAD').map(r => ({ remote: r.remote!, name: r.name })) : []}
   <CheckoutCommitModal
     hash={checkoutCommitHash}
+    detached={checkoutDetached}
     {linkedBranches}
     {linkedRemoteBranches}
     currentBranch={branchStore.currentBranch?.name}
     onCheckout={(ref, dirty) => {
-      if (linkedBranches.includes(ref)) {
+      if (checkoutDetached) {
+        vscode.postMessage({ type: 'checkout', payload: { ref, detach: true, ...dirty } });
+      } else if (linkedBranches.includes(ref)) {
         doCheckout(ref, false, dirty);
       } else if (linkedRemoteBranches.some(rb => `${rb.remote}/${rb.name}` === ref)) {
         const rb = linkedRemoteBranches.find(rb => `${rb.remote}/${rb.name}` === ref)!;

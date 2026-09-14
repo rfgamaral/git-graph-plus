@@ -862,9 +862,10 @@ export class GitService {
     });
   }
 
-  async checkout(ref: string, options?: { force?: boolean; merge?: boolean }): Promise<void> {
+  async checkout(ref: string, options?: { force?: boolean; merge?: boolean; detach?: boolean }): Promise<void> {
     this.assertSafeRef(ref, 'checkout');
     const args = ['checkout'];
+    if (options?.detach) { args.push('--detach'); }
     if (options?.force) { args.push('--force'); }
     if (options?.merge) { args.push('--merge'); }
     args.push(ref);

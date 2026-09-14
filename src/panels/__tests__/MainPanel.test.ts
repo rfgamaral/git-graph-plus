@@ -968,3 +968,22 @@ describe('MainPanel sidebar stash previews', () => {
     if (action === 'branch') expect(postedOfType('showBranch')).toEqual([{ type: 'showBranch', payload: { name: 'main' } }]);
   });
 });
+
+
+describe('detached commit checkout', () => {
+  it('enables confirmation by default and updates it when the setting changes', async () => {
+    await dispatch({ type: 'getSettings' });
+    expect(postedOfType('setDefaults').at(-1)?.payload?.checkout).toMatchObject({ confirmDetached: true });
+    H.config['defaults.checkout.confirmDetached'] = false;
+    H.configHandler!({ affectsConfiguration: key => key === 'gitGraphPlus.defaults' });
+    expect(postedOfType('setDefaults').at(-1)?.payload?.checkout).toMatchObject({ confirmDetached: false });
+  });
+
+  it.each([true, false])('forwards detach=%s without changing ordinary branch checkout', async detach => {
+    await dispatch({ type: 'checkout', payload: { ref: 'a'.repeat(40), detach, merge: true } });
+    expect(H.git.checkout).toHaveBeenCalledWith('a'.repeat(40), {
+      force: undefined, merge: true, ...(detach ? { detach: true } : {}),
+    });
+    expect(H.git.pull).not.toHaveBeenCalled();
+  });
+});

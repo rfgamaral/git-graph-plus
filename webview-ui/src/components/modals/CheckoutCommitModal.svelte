@@ -12,6 +12,7 @@
 
   interface Props {
     hash: string;
+    detached?: boolean;
     linkedBranches?: string[];
     linkedRemoteBranches?: { remote: string; name: string }[];
     currentBranch?: string;
@@ -19,17 +20,24 @@
     onClose: () => void;
   }
 
-  let { hash, linkedBranches = [], linkedRemoteBranches = [], currentBranch = '', onCheckout, onClose }: Props = $props();
+  let { hash, detached = false, linkedBranches = [], linkedRemoteBranches = [], currentBranch = '', onCheckout, onClose }: Props = $props();
 
-  const selectableBranches = untrack(() => linkedBranches.filter(b => b !== currentBranch));
+  const selectableBranches = untrack(() => detached ? [] : linkedBranches.filter(b => b !== currentBranch));
+  const remoteBranches = untrack(() => detached ? [] : linkedRemoteBranches);
   let selectedBranch = $state(selectableBranches[0] ?? '');
 
+  let showConfirmation = $state(untrack(() => !detached || defaultsStore.current.checkout.confirmDetached));
   let dirty = $state(false);
   let dirtyOption = $state<'keep' | 'stash' | 'discard'>(defaultsStore.current.checkout.dirty);
 
   onMount(() => {
     let cancelled = false;
-    requestDirtyState().then(d => { if (!cancelled) dirty = d; }).catch(() => {});
+    requestDirtyState().then(d => {
+      if (cancelled) return;
+      dirty = d;
+      if (!showConfirmation && !dirty) confirm();
+      else showConfirmation = true;
+    }).catch(() => { if (!cancelled) showConfirmation = true; });
     return () => { cancelled = true; };
   });
 
@@ -42,10 +50,12 @@
 
   function confirm() {
     const payload = buildDirtyPayload();
-    if (selectableBranches.length > 0) {
+    if (detached) {
+      onCheckout(hash, payload);
+    } else if (selectableBranches.length > 0) {
       onCheckout(selectedBranch, payload);
-    } else if (linkedRemoteBranches.length > 0) {
-      const rb = linkedRemoteBranches[0];
+    } else if (remoteBranches.length > 0) {
+      const rb = remoteBranches[0];
       onCheckout(`${rb.remote}/${rb.name}`, payload);
     } else {
       onCheckout(hash, payload);
@@ -54,6 +64,7 @@
   }
 </script>
 
+{#if showConfirmation}
 <Modal title={t('checkoutCommit.title')} {onClose}>
   {#if selectableBranches.length > 1}
     <div class="modal-context-card">
@@ -85,9 +96,9 @@
       {/if}
       <span use:tooltip={selectableBranches[0]} class="modal-pill modal-pill--target"><i class="codicon codicon-git-branch"></i><span class="modal-pill-text">{selectableBranches[0]}</span></span>
     </div>
-  {:else if linkedRemoteBranches.length > 0}
+  {:else if remoteBranches.length > 0}
     <div class="modal-context-card">
-      {#each linkedRemoteBranches as rb}
+      {#each remoteBranches as rb}
         <span use:tooltip={`${rb.remote}/${rb.name}`} class="modal-pill modal-pill--target"><i class="codicon codicon-cloud"></i><span class="modal-pill-text">{rb.remote}/{rb.name}</span></span>
       {/each}
     </div>
@@ -133,10 +144,11 @@
     <button onclick={onClose}>{t('common.cancel')}</button>
     {#if selectableBranches.length > 0}
       <button class="primary" onclick={confirm}>{t('checkoutCommit.checkout')}</button>
-    {:else if linkedRemoteBranches.length > 0}
-      <button class="primary" onclick={confirm}>{t('checkoutCommit.checkoutRemote', { name: linkedRemoteBranches[0].name })}</button>
+    {:else if remoteBranches.length > 0}
+      <button class="primary" onclick={confirm}>{t('checkoutCommit.checkoutRemote', { name: remoteBranches[0].name })}</button>
     {:else}
       <button class="primary" onclick={confirm}>{t('checkoutCommit.checkout')}</button>
     {/if}
   </div>
 </Modal>
+{/if}

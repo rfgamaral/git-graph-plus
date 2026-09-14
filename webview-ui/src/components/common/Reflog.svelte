@@ -429,7 +429,8 @@
 {#if showCheckoutModal}
   <CheckoutCommitModal
     hash={checkoutTarget}
-    onCheckout={(ref, dirty) => { vscode.postMessage({ type: 'checkout', payload: { ref, ...dirty } }); }}
+    detached={true}
+    onCheckout={(ref, dirty) => { vscode.postMessage({ type: 'checkout', payload: { ref, detach: true, ...dirty } }); }}
     onClose={() => { showCheckoutModal = false; }}
   />
 {/if}

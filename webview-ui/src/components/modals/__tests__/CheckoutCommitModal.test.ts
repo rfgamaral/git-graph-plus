@@ -88,9 +88,104 @@ describe('CheckoutCommitModal — target selection', () => {
   });
 });
 
+describe('CheckoutCommitModal — detached checkout', () => {
+  it('requires confirmation by default and ignores linked branches', async () => {
+    const onCheckout = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(CheckoutCommitModal, {
+      hash: 'abc1234', detached: true,
+      linkedBranches: ['feature/x'],
+      linkedRemoteBranches: [{ remote: 'origin', name: 'feature/x' }],
+      onCheckout, onClose,
+    });
+    expect(container.querySelector('button.primary')).not.toBeNull();
+    expect(container.querySelector('.modal-warning')).not.toBeNull();
+    expect(container.querySelector('.color-select-btn')).toBeNull();
+    expect(container.querySelector('.modal-pill--target')?.textContent?.trim()).toBe('abc1234');
+    respondToDirtyCheck(false);
+    await tick();
+    expect(onCheckout).not.toHaveBeenCalled();
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(onCheckout).toHaveBeenCalledExactlyOnceWith('abc1234', {});
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits without a modal and automatically checks out only after a clean response', async () => {
+    defaultsStore.current.checkout.confirmDetached = false;
+    const onCheckout = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(CheckoutCommitModal, {
+      hash: 'abc1234', detached: true, onCheckout, onClose,
+    });
+    await tick();
+    expect(container.querySelector('button.primary')).toBeNull();
+    expect(onCheckout).not.toHaveBeenCalled();
+    respondToDirtyCheck(false);
+    await tick();
+    expect(container.querySelector('button.primary')).toBeNull();
+    expect(onCheckout).toHaveBeenCalledExactlyOnceWith('abc1234', {});
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['keep', { merge: true }],
+    ['stash', { stash: true, stashUntracked: true }],
+    ['discard', { force: true, clean: true }],
+  ] as const)('requires an explicit click for dirty %s even with confirmation disabled', async (option, payload) => {
+    defaultsStore.current.checkout.confirmDetached = false;
+    defaultsStore.current.checkout.dirty = option;
+    const onCheckout = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(CheckoutCommitModal, {
+      hash: 'abc1234', detached: true, onCheckout, onClose,
+    });
+    expect(container.querySelector('button.primary')).toBeNull();
+    respondToDirtyCheck(true);
+    await tick();
+    expect(container.querySelector<HTMLInputElement>(`input[value="${option}"]`)!.checked).toBe(true);
+    expect(onCheckout).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(onCheckout).toHaveBeenCalledExactlyOnceWith('abc1234', payload);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows confirmation instead of checking out when the dirty request times out', async () => {
+    vi.useFakeTimers();
+    try {
+      defaultsStore.current.checkout.confirmDetached = false;
+      const onCheckout = vi.fn();
+      const { container } = render(CheckoutCommitModal, {
+        hash: 'abc1234', detached: true, onCheckout, onClose: vi.fn(),
+      });
+      expect(container.querySelector('button.primary')).toBeNull();
+      await vi.advanceTimersByTimeAsync(30_000);
+      await tick();
+      expect(container.querySelector('button.primary')).not.toBeNull();
+      expect(onCheckout).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not check out after unmounting while the dirty request is pending', async () => {
+    defaultsStore.current.checkout.confirmDetached = false;
+    const onCheckout = vi.fn();
+    const onClose = vi.fn();
+    const { unmount } = render(CheckoutCommitModal, {
+      hash: 'abc1234', detached: true, onCheckout, onClose,
+    });
+    await unmount();
+    respondToDirtyCheck(false);
+    await tick();
+    expect(onCheckout).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
 describe('CheckoutCommitModal — defaults store', () => {
   it('initializes dirtyOption from defaultsStore.current.checkout.dirty', async () => {
-    defaultsStore.current.checkout = { dirty: 'stash' };
+    defaultsStore.current.checkout.dirty = 'stash';
     const { container } = render(CheckoutCommitModal, {
       hash: 'abc1234', linkedBranches: ['feature/x'], currentBranch: 'main',
       onCheckout: vi.fn(), onClose: vi.fn(),

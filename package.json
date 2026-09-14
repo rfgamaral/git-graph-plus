@@ -693,6 +693,11 @@
           "default": false,
           "markdownDescription": "⚠️ Pre-checks a force-with-lease push after amend."
         },
+        "gitGraphPlus.defaults.checkout.confirmDetached": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a confirmation before checking out a commit in detached HEAD mode. Local changes still require confirmation when this is disabled."
+        },
         "gitGraphPlus.defaults.checkout.dirty": {
           "type": "string",
           "enum": [

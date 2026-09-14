@@ -100,6 +100,29 @@ describe('GitService integration — state mutations', () => {
   });
 
   describe('checkout', () => {
+    it('explicitly detaches at a branch tip without moving or creating branches', async () => {
+      const target = commit(repo.path, 'first');
+      runGit(repo.path, ['branch', 'target']);
+      runGit(repo.path, ['update-ref', 'refs/remotes/origin/target', target]);
+      const mainTip = commit(repo.path, 'second');
+      const refs = runGit(repo.path, ['show-ref']);
+      await svc.checkout('target', { detach: true });
+      expect(currentBranch(repo.path)).toBe('HEAD');
+      expect(head(repo.path)).toBe(target);
+      expect(runGit(repo.path, ['show-ref'])).toBe(refs);
+      expect(runGit(repo.path, ['rev-parse', 'main']).trim()).toBe(mainTip);
+    });
+
+    it('refuses detached checkout that would overwrite local changes', async () => {
+      const target = commit(repo.path, 'first', { 'a.txt': 'first\n' });
+      const tip = commit(repo.path, 'second', { 'a.txt': 'second\n' });
+      writeFileSync(join(repo.path, 'a.txt'), 'local change\n');
+      await expect(svc.checkout(target, { detach: true })).rejects.toThrow();
+      expect(currentBranch(repo.path)).toBe('main');
+      expect(head(repo.path)).toBe(tip);
+      expect(runGit(repo.path, ['diff'])).toContain('+local change');
+    });
+
     it('switches to existing branch', async () => {
       commit(repo.path, 'init');
       runGit(repo.path, ['branch', 'other']);

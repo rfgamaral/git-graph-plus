@@ -7,6 +7,15 @@ describe('resolveDefaults', () => {
     expect(resolveDefaults(undefined)).toEqual(DEFAULT_MODAL_DEFAULTS);
   });
 
+  it('requires detached checkout confirmation unless explicitly disabled', () => {
+    expect(resolveDefaults(undefined).checkout.confirmDetached).toBe(true);
+    expect(resolveDefaults({ checkout: { dirty: 'stash' } }).checkout).toEqual({
+      dirty: 'stash', confirmDetached: true,
+    });
+    expect(resolveDefaults({ checkout: { confirmDetached: 'false' } }).checkout.confirmDetached).toBe(true);
+    expect(resolveDefaults({ checkout: { confirmDetached: false } }).checkout.confirmDetached).toBe(false);
+  });
+
   it('fills missing fields in a partial modal object from fallbacks', () => {
     const out = resolveDefaults({ push: { force: 'force' } } as any);
     expect(out.push).toEqual({ force: 'force', setUpstream: true, allTags: false });

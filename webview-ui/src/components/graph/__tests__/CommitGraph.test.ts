@@ -245,6 +245,47 @@ describe('CommitGraph smoke', () => {
   });
 });
 
+describe('CommitGraph detached checkout', () => {
+  it.each([
+    ['local branch', [{ type: 'branch', name: 'feature' }]],
+    ['multiple local branches', [{ type: 'branch', name: 'feature' }, { type: 'branch', name: 'develop' }]],
+    ['remote branch', [{ type: 'remote-branch', name: 'feature', remote: 'origin' }]],
+  ] as [string, Commit['refs']][])('Checkout Commit uses the exact hash for a %s', async (_label, refs) => {
+    const hash = 'abcdef1234567890abcdef1234567890abcdef12';
+    const commit = makeCommit(hash, 'feature tip');
+    commit.refs = refs;
+    commitStore.setData(makeGraphData([commit]));
+    branchStore.branches = [
+      { name: 'main', current: true, ahead: 0, behind: 0, hash: '1234567' },
+      { name: 'feature', current: false, ahead: 0, behind: 2, hash, upstream: 'origin/feature' },
+    ];
+    const { container } = render(CommitGraph);
+    await tick();
+    globalThis.__postedMessages = [];
+    await fireEvent.contextMenu(container.querySelector<HTMLElement>('.commit-row')!, { clientX: 10, clientY: 10 });
+    const item = Array.from(container.querySelectorAll<HTMLElement>('.menu-item'))
+      .find(el => (el.textContent ?? '').trim() === 'Checkout Commit');
+    expect(item).toBeTruthy();
+    await fireEvent.click(item!);
+    await tick();
+    const requests = globalThis.__postedMessages.map(m => m.data as { type: string; payload: Record<string, unknown> });
+    expect(requests.map(m => m.type)).toEqual(['checkDirty']);
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'dirtyState', payload: { requestId: requests[0].payload.requestId, dirty: false } },
+    }));
+    await tick();
+    expect(container.querySelector('.modal-warning')).not.toBeNull();
+    expect(container.querySelector('.color-select-btn')).toBeNull();
+    expect(container.querySelector('.modal-pill--target')?.textContent?.trim()).toBe(hash.slice(0, 7));
+    expect(globalThis.__postedMessages).toHaveLength(1);
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    expect(globalThis.__postedMessages.map(m => m.data)).toEqual([
+      requests[0],
+      { type: 'checkout', payload: { ref: hash, detach: true } },
+    ]);
+  });
+});
+
 describe('CommitGraph columns', () => {
   let viewportWidth: number;
   let originalRepo: string;
