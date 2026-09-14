@@ -10,7 +10,7 @@ import { buildClassicRebaseCommand } from '../git/classic-rebase';
 import { buildFullGraph } from '../git/git-graph-builder';
 import { compileBranchColorRules, makeBranchColorResolver } from '../git/branch-color-resolver';
 import { resolveGraphColors } from '../git/graph-colors';
-import { triggerVSCodeGitAuth } from '../git/vscode-git-bridge';
+import { openVSCodeGitConflict, triggerVSCodeGitAuth } from '../git/vscode-git-bridge';
 import { FileWatcher } from '../services/file-watcher';
 import { AvatarCache } from '../services/avatar-cache';
 import { loadGitHubImage } from '../services/github-image';
@@ -1743,12 +1743,10 @@ export class MainPanel {
         case 'openConflictFile': {
           const fullPath = this.resolveRepoRelativePath(message.payload.file, 'openConflictFile');
           const fileUri = vscode.Uri.file(fullPath);
-          // Try to open in VS Code's 3-way merge editor, fallback to normal editor
           try {
-            await vscode.commands.executeCommand('git.openMergeEditor', fileUri);
-          } catch {
-            await vscode.window.showTextDocument(fileUri);
-          }
+            if (await openVSCodeGitConflict(this.repoPath, fileUri)) break;
+          } catch {}
+          await vscode.window.showTextDocument(fileUri);
           break;
         }
         default:

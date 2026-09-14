@@ -73,6 +73,7 @@ vi.mock('vscode', () => {
       showWarningMessage: vi.fn(),
       showErrorMessage: vi.fn(async () => undefined),
       showSaveDialog: vi.fn(async () => undefined),
+      showTextDocument: vi.fn(),
     },
     workspace: {
       getConfiguration: () => ({
@@ -103,11 +104,12 @@ vi.mock('../../git/git-service', async (orig) => {
 });
 vi.mock('../../services/file-watcher', () => ({ FileWatcher: class { enabled = true; suppress() {} dispose() {} } }));
 vi.mock('../../services/repo-discovery', () => ({ RepoDiscoveryService: { discoverRepos: vi.fn(async () => H.repos), clearCache: vi.fn() } }));
-vi.mock('../../git/vscode-git-bridge', () => ({ triggerVSCodeGitAuth: vi.fn(async () => false) }));
+vi.mock('../../git/vscode-git-bridge', () => ({ triggerVSCodeGitAuth: vi.fn(async () => false), openVSCodeGitConflict: vi.fn() }));
 
 import { MainPanel } from '../MainPanel';
 import { GitError, GitService } from '../../git/git-service';
 import { window } from 'vscode';
+import { openVSCodeGitConflict } from '../../git/vscode-git-bridge';
 
 const extUri = { fsPath: '/ext' } as unknown as import('vscode').Uri;
 
@@ -123,6 +125,8 @@ async function dispatch(msg: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(openVSCodeGitConflict).mockReset().mockResolvedValue(false);
+  vi.mocked(window.showTextDocument).mockReset();
   H.config = {};
   H.configHandler = null;
   H.updateConfig.mockReset().mockImplementation(async (key: string, value: unknown) => { H.config[key] = value; });
@@ -153,6 +157,37 @@ afterEach(() => {
 const commit = (hash: string) => ({
   hash, abbreviatedHash: hash.slice(0, 7), subject: 's', body: '', parents: [], refs: [],
   author: { name: '', email: '', date: '' }, committer: { name: '', email: '', date: '' },
+});
+
+describe('MainPanel conflict opening', () => {
+  it('delegates the validated file to native Git without opening a second editor', async () => {
+    vi.mocked(openVSCodeGitConflict).mockResolvedValue(true);
+    await dispatch({ type: 'openConflictFile', payload: { file: 'dir/file.txt' } });
+    expect(openVSCodeGitConflict).toHaveBeenCalledWith('/repo', expect.objectContaining({ fsPath: '/repo/dir/file.txt' }));
+    expect(window.showTextDocument).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('opens the working file when native Git cannot open it (throws: %s)', async (throws) => {
+    if (throws) vi.mocked(openVSCodeGitConflict).mockRejectedValue(new Error('native unavailable'));
+    await dispatch({ type: 'openConflictFile', payload: { file: 'file.txt' } });
+    expect(window.showTextDocument).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ fsPath: '/repo/file.txt' }));
+    expect(postedOfType('error')).toHaveLength(0);
+  });
+
+  it('reports a failed working-file fallback instead of silently doing nothing', async () => {
+    vi.mocked(window.showTextDocument).mockRejectedValue(new Error('File not found'));
+    await dispatch({ type: 'openConflictFile', payload: { file: 'missing.txt' } });
+    expect(postedOfType('error')).toEqual([expect.objectContaining({
+      payload: expect.objectContaining({ message: expect.stringContaining('File not found') }),
+    })]);
+  });
+
+  it('rejects paths outside the repository before attempting to open an editor', async () => {
+    await dispatch({ type: 'openConflictFile', payload: { file: '../outside.txt' } });
+    expect(openVSCodeGitConflict).not.toHaveBeenCalled();
+    expect(window.showTextDocument).not.toHaveBeenCalled();
+    expect(postedOfType('error')).toHaveLength(1);
+  });
 });
 
 describe('MainPanel revert', () => {

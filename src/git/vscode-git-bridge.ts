@@ -8,11 +8,14 @@ import { samePath } from '../utils/path';
  */
 interface GitRepository {
   rootUri: vscode.Uri;
+  state: { mergeChanges: { uri: vscode.Uri }[] };
+  status(): Promise<void>;
   fetch(options?: { remote?: string; ref?: string; all?: boolean; prune?: boolean; depth?: number }): Promise<void>;
 }
 
 interface GitApi {
   repositories: GitRepository[];
+  getRepository(uri: vscode.Uri): GitRepository | null;
 }
 
 interface GitExtension {
@@ -26,6 +29,16 @@ async function getGitApi(): Promise<GitApi | null> {
     try { await ext.activate(); } catch { return null; }
   }
   try { return ext.exports.getAPI(1); } catch { return null; }
+}
+
+export async function openVSCodeGitConflict(repoPath: string, fileUri: vscode.Uri): Promise<boolean> {
+  const api = await getGitApi();
+  const repo = api?.getRepository(fileUri);
+  if (!repo || !samePath(repo.rootUri.fsPath, repoPath)) return false;
+  await repo.status();
+  if (!repo.state.mergeChanges.some(change => samePath(change.uri.fsPath, fileUri.fsPath))) return false;
+  await vscode.commands.executeCommand('git.openChange', fileUri);
+  return true;
 }
 
 /**
