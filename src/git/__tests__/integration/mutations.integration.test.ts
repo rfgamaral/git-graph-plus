@@ -401,6 +401,48 @@ describe('GitService integration — state mutations', () => {
     });
   });
 
+  describe('revert', () => {
+    it.each([1, 2])('reverts a merge against parent %i with and without committing', async (mainline) => {
+      commit(repo.path, 'base', { 'base.txt': 'base\n' });
+      runGit(repo.path, ['checkout', '-b', 'feature']);
+      const second = commit(repo.path, 'feature', { 'feature.txt': 'feature\n' });
+      runGit(repo.path, ['checkout', 'main']);
+      const first = commit(repo.path, 'main', { 'main.txt': 'main\n' });
+      runGit(repo.path, ['merge', '--no-ff', 'feature', '-m', 'merge']);
+      const merge = head(repo.path);
+      const parentTree = runGit(repo.path, ['rev-parse', `${mainline === 1 ? first : second}^{tree}`]).trim();
+
+      await svc.revert(merge, { mainline });
+      expect(head(repo.path)).not.toBe(merge);
+      expect(runGit(repo.path, ['rev-parse', 'HEAD^']).trim()).toBe(merge);
+      expect(runGit(repo.path, ['rev-parse', 'HEAD^{tree}']).trim()).toBe(parentTree);
+      expect(await svc.isDirty()).toBe(false);
+
+      runGit(repo.path, ['reset', '--hard', merge]);
+      await svc.revert(merge, { mainline, noCommit: true });
+      expect(head(repo.path)).toBe(merge);
+      expect(runGit(repo.path, ['write-tree']).trim()).toBe(parentTree);
+      expect(runGit(repo.path, ['diff'])).toBe('');
+      expect(runGit(repo.path, ['diff', '--cached', '--name-only']).trim())
+        .toBe(mainline === 1 ? 'feature.txt' : 'main.txt');
+    });
+
+    it('still reverts an ordinary commit without mainline', async () => {
+      const base = commit(repo.path, 'base', { 'a.txt': 'before\n' });
+      const change = commit(repo.path, 'change', { 'a.txt': 'after\n' });
+      await svc.revert(change);
+      expect(runGit(repo.path, ['rev-parse', 'HEAD^{tree}']))
+        .toBe(runGit(repo.path, ['rev-parse', `${base}^{tree}`]));
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects invalid mainline %s without mutation', async (mainline) => {
+      const tip = commit(repo.path, 'base');
+      await expect(svc.revert(tip, { mainline })).rejects.toThrow('Mainline parent must be a positive integer');
+      expect(head(repo.path)).toBe(tip);
+      expect(await svc.isDirty()).toBe(false);
+    });
+  });
+
   describe('reset', () => {
     it('soft reset keeps working tree, moves HEAD', async () => {
       commit(repo.path, 'first', { 'a.txt': '1\n' });

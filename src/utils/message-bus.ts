@@ -74,7 +74,7 @@ export type WebviewMessage =
   | { type: 'stashSave'; payload: { message?: string; includeUntracked?: boolean; keepIndex?: boolean } }
   | { type: 'stashApply'; payload: { index: number; drop?: boolean } }
   | { type: 'cherryPick'; payload: { commit: string; commits?: string[]; noCommit?: boolean; pushAfter?: boolean } }
-  | { type: 'revert'; payload: { commit: string; noCommit?: boolean; pushAfter?: boolean } }
+  | { type: 'revert'; payload: { commit: string; noCommit?: boolean; pushAfter?: boolean; mainline?: number } }
   | { type: 'commitFixup'; payload: { commit: string } }
   | { type: 'commitSquash'; payload: { commit: string } }
   | { type: 'reverseCommitChanges'; payload: { commit: string; file: string; hunkIndex?: number; lineIndices?: number[] } }

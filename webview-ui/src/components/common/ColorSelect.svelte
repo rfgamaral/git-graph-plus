@@ -15,9 +15,10 @@
     value: string;
     onChange: (value: string) => void;
     showDot?: boolean;
+    ariaLabel?: string;
   }
 
-  let { options, value, onChange, showDot = true }: Props = $props();
+  let { options, value, onChange, showDot = true, ariaLabel }: Props = $props();
 
   let open = $state(false);
   let btnEl: HTMLButtonElement | undefined = $state();
@@ -85,7 +86,7 @@
       </span>
     {/each}
   </div>
-  <button class="color-select-btn" bind:this={btnEl} onclick={(e) => { e.stopPropagation(); toggle(); }}>
+  <button class="color-select-btn" aria-label={ariaLabel ? `${ariaLabel}: ${current.label}` : undefined} bind:this={btnEl} onclick={(e) => { e.stopPropagation(); toggle(); }}>
     {#if showDot}<span class="dot" style="background: {current.color}"></span>{/if}
     {#if current.icon}<i class="codicon {current.icon} option-icon"></i>{/if}
     <span class="label">{current.label}</span>

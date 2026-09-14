@@ -427,8 +427,10 @@ export const en: Record<string, string> = {
 
   // Revert modal
   'revert.title': 'Revert Commit',
-  'revert.desc': 'Create a new commit that undoes the changes of the selected commit.',
-  'revert.noCommit': 'Apply changes without committing',
+  'revert.desc': 'Undo the changes of the selected commit.',
+  'revert.createCommit': 'Create a revert commit',
+  'revert.mainlineParent': 'Mainline parent',
+  'revert.mainlineDescription': 'Keep this parent’s history and undo the changes introduced by the merge.',
   'revert.pushAfter': 'Push the branch after reverting',
   'revert.checkingConflicts': 'Checking for revert conflicts',
   'revert.conflictWarning': 'Revert conflict in {count} file(s)',

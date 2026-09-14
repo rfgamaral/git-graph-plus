@@ -234,6 +234,7 @@
 
   let showRevertModal = $state(false);
   let revertTarget = $state('');
+  let revertParents = $state<string[]>([]);
 
   // Single target for the shared fixup/squash modal; null when closed.
   let autosquashTarget = $state<{ hash: string; subject: string; mode: 'fixup' | 'squash' } | null>(null);
@@ -1132,7 +1133,7 @@
           action: () => openCheckoutCommitModal(commit.hash, true),
         },
         { label: t('graph.cherryPickCommit'), action: () => { cherryPickTarget = commit.hash; showCherryPickModal = true; } },
-        { label: t('graph.revertCommit'),     action: () => { revertTarget = commit.hash; showRevertModal = true; } },
+        { label: t('graph.revertCommit'),     action: () => { revertTarget = commit.hash; revertParents = commit.parents; showRevertModal = true; } },
       ]);
 
       // ── Compare / Multi-select ──
@@ -1758,9 +1759,10 @@
 {#if showRevertModal}
   <RevertModal
     commit={revertTarget}
+    parents={revertParents}
     branch={branchStore.currentBranch?.name ?? 'current branch'}
     onClose={() => { showRevertModal = false; contextMenuHash = null; }}
-    onRevert={({ noCommit, pushAfter }) => { showRevertModal = false; contextMenuHash = null; vscode.postMessage({ type: 'revert', payload: { commit: revertTarget, noCommit, pushAfter } }); }}
+    onRevert={({ noCommit, pushAfter, mainline }) => { showRevertModal = false; contextMenuHash = null; vscode.postMessage({ type: 'revert', payload: { commit: revertTarget, noCommit, pushAfter, mainline } }); }}
   />
 {/if}
 

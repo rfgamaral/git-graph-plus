@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import Modal from '../common/Modal.svelte';
   import ConflictFilesPopover from '../common/ConflictFilesPopover.svelte';
+  import ColorSelect from '../common/ColorSelect.svelte';
+  import { commitStore } from '../../lib/stores/commits.svelte';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
   import { getVsCodeApi } from '../../lib/vscode-api';
@@ -10,12 +12,21 @@
   interface Props {
     commit: string;
     branch: string;
+    parents?: string[];
     onClose: () => void;
-    onRevert: (options: { noCommit: boolean; pushAfter: boolean }) => void;
+    onRevert: (options: { noCommit: boolean; pushAfter: boolean; mainline?: number }) => void;
   }
 
-  let { commit, branch, onClose, onRevert }: Props = $props();
-  let noCommit = $state(defaultsStore.current.revert.noCommit);
+  let { commit, branch, parents = [], onClose, onRevert }: Props = $props();
+  let createCommit = $state(!defaultsStore.current.revert.noCommit);
+  let mainline = $state('1');
+  let parentSubjects = $state<Record<string, string>>({});
+  const parentOptions = $derived(parents.map((hash, index) => ({
+    value: String(index + 1),
+    label: `${hash.substring(0, 7)} ${parentSubjects[hash] ?? commitStore.commits.find(c => c.hash === hash)?.subject ?? ''}`.trim(),
+    color: '',
+    icon: 'codicon-git-commit',
+  })));
   let pushAfter = $state(defaultsStore.current.revert.pushAfter);
   let revertBtn: HTMLButtonElement | undefined = $state();
   let conflictPrediction = $state<{ hasConflict: boolean; files: string[] } | null>(null);
@@ -23,8 +34,27 @@
   onMount(() => {
     revertBtn?.focus();
     const vscode = getVsCodeApi();
+    const handler = (event: MessageEvent) => {
+      const data = event.data;
+      if (data.type === 'commitData' && parents.includes(data.payload?.commit?.hash)) {
+        parentSubjects[data.payload.commit.hash] = data.payload.commit.subject;
+      }
+    };
+    window.addEventListener('message', handler);
+    if (parents.length > 1) {
+      for (const hash of parents) {
+        if (!commitStore.commits.some(c => c.hash === hash)) {
+          vscode.postMessage({ type: 'getCommitData', payload: { hash } });
+        }
+      }
+    }
+    return () => window.removeEventListener('message', handler);
+  });
+
+  $effect(() => {
+    const theirs = parents.length > 1 ? parents[Number(mainline) - 1] : commit + '^';
     const requestId = `rv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    vscode.postMessage({ type: 'predictConflicts', payload: { ours: 'HEAD', theirs: commit + '^', mergeBase: commit, requestId } });
+    conflictPrediction = null;
     const handler = (event: MessageEvent) => {
       if (event.data.type !== 'conflictPrediction') { return; }
       if (event.data.payload?.requestId !== requestId) { return; }
@@ -32,6 +62,7 @@
       window.removeEventListener('message', handler);
     };
     window.addEventListener('message', handler);
+    getVsCodeApi().postMessage({ type: 'predictConflicts', payload: { ours: 'HEAD', theirs, mergeBase: commit, requestId } });
     return () => window.removeEventListener('message', handler);
   });
 </script>
@@ -43,13 +74,20 @@
     <i class="codicon codicon-arrow-right" style="color: var(--text-secondary);"></i>
     <span use:tooltip={branch} class="modal-pill modal-pill--source"><i class="codicon codicon-git-branch"></i><span class="modal-pill-text">{branch}</span></span>
   </div>
+  {#if parents.length > 1}
+    <div class="modal-form-group">
+      <div class="modal-field-label">{t('revert.mainlineParent')}</div>
+      <ColorSelect options={parentOptions} value={mainline} onChange={(value) => { mainline = value; }} showDot={false} ariaLabel={t('revert.mainlineParent')} />
+      <p class="modal-desc mainline-description">{t('revert.mainlineDescription')}</p>
+    </div>
+  {/if}
   <div class="modal-form-group">
     <label class="modal-checkbox">
-      <input type="checkbox" bind:checked={noCommit} />
-      <span>{t('revert.noCommit')}</span>
+      <input type="checkbox" bind:checked={createCommit} />
+      <span>{t('revert.createCommit')}</span>
     </label>
   </div>
-  {#if !noCommit}
+  {#if createCommit}
     <div class="modal-form-group">
       <label class="modal-checkbox">
         <input type="checkbox" bind:checked={pushAfter} />
@@ -73,11 +111,19 @@
       {/if}
     </div>
     <button onclick={onClose}>{t('common.cancel')}</button>
-    <button class="primary" bind:this={revertBtn} onclick={() => onRevert({ noCommit, pushAfter: !noCommit && pushAfter })}>{t('revert.revert')}</button>
+    <button class="primary" bind:this={revertBtn} onclick={() => onRevert({ noCommit: !createCommit, pushAfter: createCommit && pushAfter, ...(parents.length > 1 ? { mainline: Number(mainline) } : {}) })}>{t('revert.revert')}</button>
   </div>
 </Modal>
 
 <style>
+  .modal-field-label {
+    font-size: inherit;
+  }
+
+  .mainline-description {
+    font-size: 11px;
+  }
+
   .form-actions {
     align-items: center;
   }

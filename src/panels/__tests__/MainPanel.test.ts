@@ -14,6 +14,7 @@ const H = vi.hoisted(() => {
     searchByHash: vi.fn(async () => null),
     worktreeList: vi.fn(async () => []),
     merge: vi.fn(async () => {}),
+    revert: vi.fn(async () => {}),
     fastForwardRef: vi.fn(async () => {}),
     stashPop: vi.fn(async () => {}),
     showCommitDiff: vi.fn(async () => []),
@@ -152,6 +153,13 @@ afterEach(() => {
 const commit = (hash: string) => ({
   hash, abbreviatedHash: hash.slice(0, 7), subject: 's', body: '', parents: [], refs: [],
   author: { name: '', email: '', date: '' }, committer: { name: '', email: '', date: '' },
+});
+
+describe('MainPanel revert', () => {
+  it.each([1, 2])('forwards mainline parent %i and noCommit', async (mainline) => {
+    await dispatch({ type: 'revert', payload: { commit: 'merge-sha', mainline, noCommit: true } });
+    expect(H.git.revert).toHaveBeenCalledWith('merge-sha', { mainline, noCommit: true });
+  });
 });
 
 describe('MainPanel construction', () => {

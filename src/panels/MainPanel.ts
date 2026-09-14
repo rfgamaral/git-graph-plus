@@ -1277,7 +1277,7 @@ export class MainPanel {
           break;
         }
         case 'revert': {
-          await this.gitService.revert(message.payload.commit, { noCommit: message.payload.noCommit });
+          await this.gitService.revert(message.payload.commit, { noCommit: message.payload.noCommit, mainline: message.payload.mainline });
           // Optional follow-up push (only meaningful when a commit was created).
           // A revert adds a new commit, so the push needs no force.
           let revertPushFailed = false;

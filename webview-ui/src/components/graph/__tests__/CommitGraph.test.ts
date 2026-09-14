@@ -54,6 +54,32 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+describe('CommitGraph merge revert', () => {
+  it('uses the clicked merge parents rather than the selected commit', async () => {
+    commitStore.setData(makeGraphData([
+      makeCommit('selected', 'Selected commit', ['unrelated']),
+      makeCommit('merge-sha', 'Merge commit', ['parent-one', 'parent-two']),
+      makeCommit('parent-one', 'First parent'),
+      makeCommit('parent-two', 'Second parent'),
+    ]));
+    uiStore.selectedCommitHash = 'selected';
+    const { container } = render(CommitGraph, {});
+    await tick();
+    await fireEvent.contextMenu(container.querySelectorAll('.commit-row')[1], { clientX: 10, clientY: 10 });
+    const item = Array.from(container.querySelectorAll<HTMLElement>('*'))
+      .find(el => el.children.length === 0 && el.textContent?.trim() === 'Revert Commit');
+    expect(item).toBeTruthy();
+    await fireEvent.click(item!);
+    expect(container.querySelector('.color-select-btn')?.textContent).toContain('First parent');
+    await fireEvent.click(container.querySelector('.color-select-btn')!);
+    await fireEvent.click(container.querySelectorAll('.color-select-option')[1]);
+    await fireEvent.click(container.querySelector('button.primary')!);
+    expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({
+      type: 'revert', payload: { commit: 'merge-sha', mainline: 2, noCommit: false, pushAfter: false },
+    });
+  });
+});
+
 describe('CommitGraph smoke', () => {
   it('renders without crashing when commits are empty', () => {
     const { container } = render(CommitGraph, {});

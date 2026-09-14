@@ -1974,9 +1974,15 @@ export class GitService {
     await this.exec(args);
   }
 
-  async revert(hash: string, options?: { noCommit?: boolean }): Promise<void> {
+  async revert(hash: string, options?: { noCommit?: boolean; mainline?: number }): Promise<void> {
     this.assertSafeRef(hash, 'revert');
     const args = ['revert'];
+    if (options?.mainline !== undefined) {
+      if (!Number.isSafeInteger(options.mainline) || options.mainline < 1) {
+        throw new Error('Mainline parent must be a positive integer');
+      }
+      args.push('--mainline', String(options.mainline));
+    }
     if (options?.noCommit) {
       args.push('--no-commit');
     }
