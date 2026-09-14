@@ -1751,6 +1751,12 @@
     border: 1px solid var(--badge-color);
   }
 
+  :global(body.vscode-high-contrast-light) .ref-badge {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--vscode-contrastBorder, var(--text-primary));
+  }
+
   .ref-icon {
     font-size: 1em;
     flex-shrink: 0;

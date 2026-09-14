@@ -2259,6 +2259,12 @@
     border: 1px solid var(--badge-color);
   }
 
+  :global(body.vscode-high-contrast-light) .ref-badge {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--vscode-contrastBorder, var(--text-primary));
+  }
+
   .badge-cloud-only {
     padding: 1px 5px 1px calc(var(--badge-bar-width, 4px) + 4px);
     height: calc(17px + 2px + 2px); /* line-height + padding top/bottom + border */
@@ -2284,6 +2290,9 @@
     box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.12);
   }
 
+  :global(body.vscode-high-contrast-light) .ref-badge:hover,
+  :global(body.vscode-high-contrast-light) .badge-cloud-only:hover + .ref-badge,
+  :global(body.vscode-high-contrast-light) .badge-cloud-only:has(+ .ref-badge:hover),
   :global(body.vscode-light) .ref-badge:hover,
   :global(body.vscode-light) .badge-cloud-only:hover + .ref-badge,
   :global(body.vscode-light) .badge-cloud-only:has(+ .ref-badge:hover) {
