@@ -1939,22 +1939,26 @@ describe('App — working-state restoration', () => {
     await waitFor(() => expect(uiStore.selectedCommitHash).toBe('head'));
   });
 
-  it('writes changes and restores them on a fresh mount', async () => {
+  it.each(['log', 'activity'] as const)('writes changes and restores the %s view on a fresh mount', async (viewMode) => {
     render(App);
     postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
     uiStore.selectCommit('older');
     uiStore.rightPanelWidth = 360;
     uiStore.bottomPanelHeight = 290;
-    uiStore.viewMode = 'log';
+    uiStore.viewMode = viewMode;
     await waitFor(() => expect(saved.viewState.ui).toMatchObject({
-      selectedCommitHash: 'older', rightPanelWidth: 360, bottomPanelHeight: 290, viewMode: 'log',
+      selectedCommitHash: 'older', rightPanelWidth: 360, bottomPanelHeight: 290, viewMode,
     }));
     cleanup();
     resetStores();
     globalThis.__postedMessages = [];
     render(App);
     postMsg('logData', { commits, graph: [], hasMore: false, currentLimit: 400 });
-    await waitFor(() => expect(uiStore.viewMode).toBe('log'));
+    await waitFor(() => expect(uiStore.viewMode).toBe(viewMode));
+    if (viewMode === 'activity') {
+      expect(document.querySelector('.activity-log')).not.toBeNull();
+      expect(globalThis.__postedMessages.map(m => m.data)).toContainEqual({ type: 'getActivityLog' });
+    }
     expect(uiStore.selectedCommitHash).toBe('older');
     expect(uiStore.rightPanelWidth).toBe(360);
     expect(uiStore.bottomPanelHeight).toBe(290);

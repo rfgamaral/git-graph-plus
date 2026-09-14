@@ -229,6 +229,17 @@ describe('Reflog — relativeTime branches', () => {
     deliverReflog([entryAt(date)]);
   }
 
+  it('keeps seconds for recent entries rather than Activity’s just-now label', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-09-15T12:00:00Z').getTime());
+    try {
+      const { container } = render(Reflog, { active: true });
+      deliverAt(new Date(Date.now() - 30_000));
+      await waitFor(() => expect(container.querySelector('.reflog-row .col-date')?.textContent?.trim()).toBe('30s ago'));
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('formats minutes-old entries with the minute key', async () => {
     const { container } = render(Reflog, { active: true });
     deliverAt(new Date(Date.now() - 5 * 60 * 1000));

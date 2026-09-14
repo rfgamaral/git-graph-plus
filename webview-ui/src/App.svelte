@@ -14,6 +14,7 @@
   import Toolbar from './components/layout/Toolbar.svelte';
   import SearchBar from './components/common/SearchBar.svelte';
   import Reflog from './components/common/Reflog.svelte';
+  import ActivityLog from './components/common/ActivityLog.svelte';
   import StatsView from './components/common/StatsView.svelte';
   import DeleteBranchModal from './components/modals/DeleteBranchModal.svelte';
   import DeleteTagModal from './components/modals/DeleteTagModal.svelte';
@@ -223,7 +224,7 @@ import AmendModal from './components/modals/AmendModal.svelte';
       ...viewState(),
       bottomPanelHeight: Math.round(window.innerHeight * BOTTOM_PANEL_DEFAULT_RATIO),
       rightPanelWidth: Math.round(window.innerWidth * 0.4),
-    }, { viewMode: ['graph', 'log', 'stats'] });
+    }, { viewMode: ['graph', 'log', 'activity', 'stats'] });
     restored.bottomPanelHeight = Math.max(window.innerHeight * BOTTOM_PANEL_MIN_RATIO, Math.min(window.innerHeight * BOTTOM_PANEL_MAX_RATIO, restored.bottomPanelHeight));
     restored.rightPanelWidth = Math.max(Math.min(240, window.innerWidth * 0.5), Math.min(window.innerWidth * 0.7, restored.rightPanelWidth));
     Object.assign(uiStore, restored);
@@ -749,6 +750,10 @@ import AmendModal from './components/modals/AmendModal.svelte';
     {:else if uiStore.viewMode === 'log'}
       <div class="log-container">
         <Reflog active={uiStore.viewMode === 'log'} />
+      </div>
+    {:else if uiStore.viewMode === 'activity'}
+      <div class="log-container">
+        <ActivityLog />
       </div>
     {:else if uiStore.viewMode === 'stats'}
       <div class="stats-container">

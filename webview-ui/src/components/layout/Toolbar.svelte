@@ -212,6 +212,13 @@
     </button>
     <button
       class="view-tab"
+      class:active={uiStore.viewMode === 'activity'}
+      onclick={() => { uiStore.viewMode = 'activity'; }}
+    >
+      {t('toolbar.activity')}
+    </button>
+    <button
+      class="view-tab"
       class:active={uiStore.viewMode === 'stats'}
       onclick={() => { uiStore.viewMode = 'stats'; }}
     >

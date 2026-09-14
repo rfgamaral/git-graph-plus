@@ -41,10 +41,10 @@ beforeEach(() => {
 });
 
 describe('Toolbar — view tabs', () => {
-  it('renders the three view-mode tabs and graph is active by default', () => {
+  it('renders the four view-mode tabs in order and graph is active by default', () => {
     const { container } = render(Toolbar);
     const tabs = container.querySelectorAll<HTMLButtonElement>('.view-tab');
-    expect(tabs.length).toBe(3);
+    expect(Array.from(tabs, tab => tab.textContent?.trim())).toEqual(['Graph', 'Reflog', 'Activity', 'Stats']);
     expect(tabs[0].classList.contains('active')).toBe(true);
   });
 
@@ -53,7 +53,10 @@ describe('Toolbar — view tabs', () => {
     const tabs = container.querySelectorAll<HTMLButtonElement>('.view-tab');
     await fireEvent.click(tabs[1]); // log
     expect(uiStore.viewMode).toBe('log');
-    await fireEvent.click(tabs[2]); // stats
+    await fireEvent.click(tabs[2]);
+    expect(uiStore.viewMode).toBe('activity');
+    expect(tabs[2].classList.contains('active')).toBe(true);
+    await fireEvent.click(tabs[3]);
     expect(uiStore.viewMode).toBe('stats');
     await fireEvent.click(tabs[0]); // back to graph
     expect(uiStore.viewMode).toBe('graph');

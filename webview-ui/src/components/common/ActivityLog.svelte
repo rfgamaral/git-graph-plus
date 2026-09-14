@@ -3,6 +3,8 @@
   import { getVsCodeApi } from '../../lib/vscode-api';
   import { t } from '../../lib/i18n/index.svelte';
   import { tooltip } from '../../lib/actions/tooltip';
+  import { relativeTime } from '../../lib/utils/relative-time';
+  import ContextMenu from './ContextMenu.svelte';
 
   interface LogEntry {
     command: string;
@@ -22,22 +24,39 @@
 
   let allEntries = $state<LogEntry[]>([]);
   let showAll = $state(false);
-  let autoRefresh = $state(true);
+  let query = $state('');
+  let inputEl: HTMLInputElement | undefined = $state();
+  let viewMenu = $state<{ x: number; y: number } | null>(null);
 
   function isUserAction(cmd: string): boolean {
     return ACTION_PATTERNS.some(p => cmd.includes(p));
   }
 
+  const searchQuery = $derived(query.trim().toLowerCase());
   let displayEntries = $derived(
-    showAll ? allEntries : allEntries.filter(e => isUserAction(e.command))
+    allEntries.filter(e => (showAll || isUserAction(e.command)) && e.command.toLowerCase().includes(searchQuery))
   );
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && (viewMenu || event.target === inputEl)) {
+      if (viewMenu) viewMenu = null;
+      else query = '';
+      event.stopImmediatePropagation();
+      event.preventDefault();
+    } else if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+      event.preventDefault();
+      inputEl?.focus();
+    }
+  }
 
   function refresh() {
     vscode.postMessage({ type: 'getActivityLog' });
   }
 
   function formatTime(timestamp: string): string {
-    return new Date(timestamp).toLocaleTimeString();
+    return Date.now() - new Date(timestamp).getTime() < 60000
+      ? t('activityLog.justNow')
+      : relativeTime(timestamp);
   }
 
   function formatDuration(ms: number): string {
@@ -60,37 +79,60 @@
       }
     }
     window.addEventListener('message', handleMessage);
+    window.addEventListener('keydown', handleKeydown, true);
     refresh();
 
-    const interval = setInterval(() => {
-      if (autoRefresh) { refresh(); }
-    }, 2000);
+    const interval = setInterval(refresh, 2000);
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('keydown', handleKeydown, true);
       clearInterval(interval);
     };
   });
 </script>
 
 <div class="activity-log">
-  <div class="log-header">
-    <span>{t('activityLog.title')}</span>
-    <div class="log-actions">
-      <label class="log-toggle">
-        <input type="checkbox" bind:checked={showAll} />
-        <span>{t('activityLog.showAll')}</span>
-      </label>
-      <label class="log-toggle">
-        <input type="checkbox" bind:checked={autoRefresh} />
-        <span>{t('activityLog.auto')}</span>
-      </label>
-      <button class="log-refresh" onclick={refresh} aria-label={t('activityLog.refresh')} use:tooltip={t('activityLog.refresh')}>
-        <i class="codicon codicon-refresh"></i>
-      </button>
+  <div class="search-bar">
+    <div class="search-row">
+      <i class="codicon codicon-search search-icon"></i>
+      <input
+        class="search-input"
+        type="text"
+        bind:this={inputEl}
+        bind:value={query}
+        placeholder={t('activityLog.searchPlaceholder')}
+        aria-label={t('activityLog.searchPlaceholder')}
+      />
+      {#if query}
+        <button class="nav-btn close-btn" onclick={() => { query = ''; }} aria-label={t('search.clear')} use:tooltip={t('search.clear')}>
+          <i class="codicon codicon-close"></i>
+        </button>
+      {/if}
     </div>
+    <button
+      class="view-btn"
+      onclick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        viewMenu = viewMenu ? null : { x: rect.left, y: rect.bottom + 4 };
+      }}
+      aria-label={t('toolbar.view')}
+      aria-haspopup="menu"
+      aria-expanded={viewMenu !== null}
+    >
+      <i class="codicon codicon-settings filter-btn-icon"></i>
+      <span class="filter-label">{t('toolbar.view')}</span>
+      <i class="codicon codicon-chevron-down chevron"></i>
+    </button>
   </div>
   <div class="log-list">
+    <div class="log-header" data-vscode-context={JSON.stringify({ preventDefaultContextMenuItems: true })}>
+      <span>#</span>
+      <span>{t('activityLog.status')}</span>
+      <span>{t('activityLog.command')}</span>
+      <span>{t('activityLog.duration')}</span>
+      <span>{t('activityLog.when')}</span>
+    </div>
     {#each displayEntries as entry, i}
       <div class="log-entry" class:failed={!entry.success}>
         <span class="log-index">{displayEntries.length - i}</span>
@@ -99,14 +141,27 @@
         </span>
         <span class="log-command truncate" use:tooltip={entry.command}>{friendlyCommand(entry.command)}</span>
         <span class="log-duration">{formatDuration(entry.duration)}</span>
-        <span class="log-time">{formatTime(entry.timestamp)}</span>
+        <span class="log-time" use:tooltip={new Date(entry.timestamp).toLocaleString()}>{formatTime(entry.timestamp)}</span>
       </div>
     {/each}
     {#if displayEntries.length === 0}
-      <div class="log-empty">{t('activityLog.empty')}</div>
+      <div class="log-empty">{t(allEntries.length ? 'activityLog.noMatches' : 'activityLog.empty')}</div>
     {/if}
   </div>
 </div>
+
+{#if viewMenu}
+  <div class="view-menu">
+    <ContextMenu
+      x={viewMenu.x}
+      y={viewMenu.y}
+      items={[
+        { label: t('activityLog.showAll'), checked: showAll, action: () => { showAll = !showAll; } },
+      ]}
+      onClose={() => { viewMenu = null; }}
+    />
+  </div>
+{/if}
 
 <style>
   .activity-log {
@@ -116,64 +171,167 @@
     overflow: hidden;
   }
 
-  .log-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background: var(--bg-secondary);
+  .view-menu :global(.context-menu) {
+    min-width: 140px;
+  }
+
+  .search-bar {
+    height: var(--pane-toolbar-height);
+    padding: 5px;
     border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
     flex-shrink: 0;
-  }
-
-  .log-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
+    position: relative;
   }
 
-  .log-toggle {
+  .search-row {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: normal;
-    text-transform: none;
-    letter-spacing: 0;
-    cursor: pointer;
+    gap: 4px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border, var(--border-color));
+    border-radius: 4px;
+    padding: 0 6px;
+    height: 26px;
+    transition: border-color 0.15s;
   }
 
-  .log-toggle input { margin: 0; }
+  .search-row:focus-within {
+    border-color: var(--vscode-focusBorder, #007fd4);
+  }
 
-  .log-refresh {
-    background: transparent;
-    border: none;
+  .search-icon {
+    font-size: 14px;
     color: var(--text-secondary);
-    cursor: pointer;
-    padding: 2px;
-    font-size: inherit;
+    flex-shrink: 0;
+    opacity: 0.6;
   }
 
-  .log-refresh:hover {
+  .search-row:focus-within .search-icon {
+    opacity: 1;
+  }
+
+  .search-input {
+    flex: 1;
+    height: 16px;
+    line-height: 16px;
+    padding: 0 2px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    font-size: inherit;
+    font-family: inherit;
+    outline: none;
+    min-width: 0;
+  }
+
+  .search-input::placeholder {
+    opacity: 0.8;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: background 0.1s;
+  }
+
+  .nav-btn .codicon {
+    font-size: 14px;
+  }
+
+  .close-btn:hover:not(:disabled) {
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+  }
+
+  .view-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.1s, border-color 0.1s;
+    max-width: 130px;
+  }
+
+  .filter-btn-icon { font-size: 14px; flex-shrink: 0; }
+
+  .filter-label {
+    flex: 1;
+    line-height: 16px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .view-btn:hover {
     color: var(--text-primary);
+    border-color: var(--vscode-focusBorder, #007fd4);
+  }
+
+  .chevron { font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+
+  .view-btn:hover .chevron {
+    opacity: 1;
   }
 
   .log-list {
     flex: 1;
-    overflow-y: auto;
-    font-size: 11px;
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr) max-content max-content;
+    align-content: start;
+    overflow: auto;
+    position: relative;
   }
 
-  .log-entry {
-    display: flex;
+  .log-header, .log-entry {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+    height: 30px;
+  }
+
+  .log-header {
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    font-weight: 600;
+    user-select: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .log-header > span, .log-entry > span {
+    padding: 0 10px;
+    white-space: nowrap;
   }
 
   .log-entry:hover {
@@ -184,18 +342,17 @@
     color: var(--vscode-errorForeground, #f44336);
   }
 
+  .log-header > span:first-child {
+    text-align: center;
+  }
+
   .log-index {
-    width: 24px;
-    flex-shrink: 0;
     text-align: right;
     color: var(--text-secondary);
-    font-size: 10px;
-    opacity: 0.5;
+    opacity: 0.7;
   }
 
   .log-status {
-    width: 14px;
-    flex-shrink: 0;
     text-align: center;
   }
 
@@ -204,29 +361,20 @@
   }
 
   .log-command {
-    flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--vscode-editor-font-family, monospace);
   }
 
-  .log-duration {
-    flex-shrink: 0;
-    opacity: 0.5;
-    width: 45px;
+  .log-duration, .log-time {
+    color: var(--text-secondary);
     text-align: right;
-    font-size: 10px;
-  }
-
-  .log-time {
-    flex-shrink: 0;
-    opacity: 0.4;
-    width: 70px;
-    text-align: right;
-    font-size: 10px;
   }
 
   .log-empty {
-    padding: 20px;
+    grid-column: 1 / -1;
+    padding: 32px;
     text-align: center;
     color: var(--text-secondary);
   }

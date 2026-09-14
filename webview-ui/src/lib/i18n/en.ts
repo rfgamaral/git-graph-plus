@@ -2,6 +2,7 @@ export const en: Record<string, string> = {
   // Toolbar
   'toolbar.history': 'Graph',
   'toolbar.log': 'Reflog',
+  'toolbar.activity': 'Activity',
   'toolbar.stats': 'Stats',
   'toolbar.fetch': 'Fetch',
   'toolbar.pull': 'Pull',
@@ -305,10 +306,14 @@ export const en: Record<string, string> = {
   'search.filterBranches': 'Search',
 
   // Activity log
-  'activityLog.title': 'Activity Log',
-  'activityLog.auto': 'Auto',
-  'activityLog.showAll': 'All',
-  'activityLog.refresh': 'Refresh',
+  'activityLog.showAll': 'Show background commands',
+  'activityLog.searchPlaceholder': 'Search commands…',
+  'activityLog.noMatches': 'No matching commands',
+  'activityLog.status': 'Status',
+  'activityLog.command': 'Command',
+  'activityLog.duration': 'Duration',
+  'activityLog.when': 'When',
+  'activityLog.justNow': 'just now',
   'activityLog.empty': 'No commands executed yet',
 
   // Reflog

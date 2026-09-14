@@ -15,7 +15,7 @@ class UiStore {
   comparing = $state(false);
   compareRef1 = $state<string | null>(null);
   compareRef2 = $state<string | null>(null);
-  viewMode = $state<'graph' | 'log' | 'stats'>('graph');
+  viewMode = $state<'graph' | 'log' | 'activity' | 'stats'>('graph');
   bottomPanelHeight = $state(250);
   rightPanelWidth = $state(400);
   commitDetailsPosition = $state<'bottom' | 'right'>('bottom');
@@ -186,7 +186,7 @@ class UiStore {
     this.compareRef2 = null;
   }
 
-  setViewMode(mode: 'graph' | 'log' | 'stats') {
+  setViewMode(mode: 'graph' | 'log' | 'activity' | 'stats') {
     this.viewMode = mode;
   }
 
