@@ -190,6 +190,7 @@ export type ExtensionMessage =
   | { type: 'setLoadMoreCount'; payload: { count: number } }
   | { type: 'setBadgeBarThickness'; payload: { width: number } }
   | { type: 'setGraphLaneSpacing'; payload: { spacing: number } }
+  | { type: 'setShowSignatureStatus'; payload: { enabled: boolean } }
   | { type: 'setGraphColors'; payload: { colors: string[] } }
   | { type: 'setCommitLinkRules'; payload: { rules: LinkRule[] } }
   | { type: 'repoList'; payload: { repos: Array<{ path: string; name: string; type: 'root' | 'submodule' | 'nested' }>; active: string; viewOptions: GraphViewOptions } }

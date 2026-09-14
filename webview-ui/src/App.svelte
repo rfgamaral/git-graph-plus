@@ -318,6 +318,9 @@ import AmendModal from './components/modals/AmendModal.svelte';
         case 'setGraphLaneSpacing':
           uiStore.graphLaneSpacing = msg.payload.spacing;
           break;
+        case 'setShowSignatureStatus':
+          uiStore.showSignatureStatus = msg.payload.enabled;
+          break;
         case 'setGraphColors':
           graphColorsStore.set(msg.payload.colors);
           break;

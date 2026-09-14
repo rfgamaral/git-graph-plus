@@ -48,6 +48,7 @@ class UiStore {
   operating = $state<string | null>(null);
   badgeBarWidth = $state(4);
   graphLaneSpacing = $state(13);
+  showSignatureStatus = $state(true);
   graphViewOptions = $state({ showTagLabels: true, showStashEntries: true, showLostCommits: false });
   loadMoreCount = $state(50);
   interactiveRebaseMode = $state<InteractiveRebaseMode>('ui');

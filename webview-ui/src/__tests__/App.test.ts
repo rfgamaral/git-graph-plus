@@ -23,6 +23,7 @@ function resetStores() {
   branchStore.stashes = [];
   branchStore.worktrees = [];
   uiStore.viewMode = 'graph';
+  uiStore.showSignatureStatus = true;
   uiStore.fileListMode = 'tree';
   uiStore.defaultCommitTab = 'details';
   uiStore.graphViewOptions = { showTagLabels: true, showStashEntries: true, showLostCommits: false };
@@ -126,6 +127,7 @@ describe('App — startup settings delivery', () => {
       post(message);
       if ((message as { type: string }).type === 'getSettings') {
         postMsg('setDateTimeFormat', { format: 'R HH:mm:ss', relativeDateFallbackFormat: 'D MMM YYYY' });
+        postMsg('setShowSignatureStatus', { enabled: false });
       }
     });
     try {
@@ -136,7 +138,10 @@ describe('App — startup settings delivery', () => {
         await waitFor(() => {
           expect(uiStore.dateTimeFormat).toBe('R HH:mm:ss');
           expect(uiStore.relativeDateFallbackFormat).toBe('D MMM YYYY');
+          expect(uiStore.showSignatureStatus).toBe(false);
         });
+        postMsg('setShowSignatureStatus', { enabled: true });
+        expect(uiStore.showSignatureStatus).toBe(true);
         await app.unmount();
       }
       expect(spy.mock.calls.filter(([message]) => (message as { type: string }).type === 'getSettings')).toHaveLength(2);

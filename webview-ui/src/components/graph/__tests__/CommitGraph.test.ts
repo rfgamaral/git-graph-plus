@@ -37,6 +37,7 @@ function makeGraphData(commits: Commit[]): CommitGraphData {
 
 beforeEach(() => {
   i18n.setLocale('en');
+  uiStore.showSignatureStatus = true;
   // Reset shared singletons between tests.
   commitStore.commits = [];
   commitStore.graphNodes = [];
@@ -350,22 +351,31 @@ describe('CommitGraph columns', () => {
     uiStore.dateTimeFormat = originalDateFormat;
   });
 
-  it('reserves badge space before verification and keeps widths stable through results and refreshes', async () => {
+  it.each([true, false])('keeps widths stable through verification with signature status enabled=%s', async enabled => {
+    uiStore.showSignatureStatus = enabled;
     commitStore.commits[0].author.name = 'Long author name';
     const { container } = render(CommitGraph, {});
     await tick();
     const fitted = widths(container);
-    expect(fitted).toEqual([228, 55, 70]);
-    for (const status of ['good', 'unverified', 'none'] as const) {
+    expect(fitted).toEqual([enabled ? 228 : 208, 55, 70]);
+    for (const status of ['good', 'unknown-trust', 'unverified', 'none'] as const) {
       commitStore.commits[0].signatureStatus = status;
       await tick();
       expect(widths(container)).toEqual(fitted);
-      expect(container.querySelector('.sig-icon') !== null).toBe(status !== 'none');
+      expect(container.querySelector('.sig-icon') !== null).toBe(enabled && status !== 'none');
       commitStore.setData(makeGraphData([{ ...commitStore.commits[0] }]));
       await tick();
       expect(widths(container)).toEqual(fitted);
     }
     commitStore.setData(makeGraphData([{ ...commitStore.commits[0], signatureStatus: undefined }]));
+    await tick();
+    expect(widths(container)).toEqual(fitted);
+    commitStore.commits[0].signatureStatus = 'good';
+    uiStore.showSignatureStatus = !enabled;
+    await tick();
+    expect(widths(container)).toEqual([enabled ? 208 : 228, 55, 70]);
+    expect(container.querySelector('.sig-icon') !== null).toBe(!enabled);
+    uiStore.showSignatureStatus = enabled;
     await tick();
     expect(widths(container)).toEqual(fitted);
   });

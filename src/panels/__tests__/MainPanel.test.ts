@@ -242,6 +242,7 @@ describe('MainPanel graph signatures', () => {
     expect(postedOfType('graphSignatureData')).toEqual([]);
     expect(H.git.getCommitSignature).toHaveBeenCalledTimes(1);
     if (change === 'config') {
+      expect(postedOfType('setShowSignatureStatus').at(-1)?.payload).toEqual({ enabled: false });
       H.git.log.mockResolvedValue([commit(hashes[2])]);
       await dispatch({ type: 'getLog', payload: {} });
       expect(H.git.getCommitSignature).toHaveBeenCalledTimes(1);
@@ -298,7 +299,8 @@ describe('MainPanel construction', () => {
 });
 
 describe('MainPanel startup settings', () => {
-  it('delivers configured dates and the other initial settings after the request', async () => {
+  it.each([true, false])('delivers initial settings with signature status enabled=%s', async enabled => {
+    H.config['showSignatureStatus'] = enabled;
     H.config['dateTimeFormat'] = 'R HH:mm:ss';
     H.config['relativeDateFallbackFormat'] = 'D MMM YYYY';
     expect(postedOfType('setDateTimeFormat')).toHaveLength(0);
@@ -307,6 +309,7 @@ describe('MainPanel startup settings', () => {
       type: 'setDateTimeFormat',
       payload: { format: 'R HH:mm:ss', relativeDateFallbackFormat: 'D MMM YYYY' },
     }]);
+    expect(postedOfType('setShowSignatureStatus').at(-1)?.payload).toEqual({ enabled });
     expect(posted().map(m => m.type)).toEqual(expect.arrayContaining([
       'setLocale', 'setDefaults', 'setBadgeBarThickness', 'setGraphColors',
       'setGraphLaneSpacing', 'setLoadMoreCount', 'setInteractiveRebaseMode',

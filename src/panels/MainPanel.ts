@@ -222,6 +222,7 @@ export class MainPanel {
           this.refreshAll();
         }
         if (e.affectsConfiguration('gitGraphPlus.showSignatureStatus')) {
+          this.post({ type: 'setShowSignatureStatus', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('showSignatureStatus', true) } });
           this.signatureQueue = undefined;
           void this.refreshAll();
         }
@@ -487,6 +488,7 @@ export class MainPanel {
           this.post({ type: 'setBadgeBarThickness', payload: { width: this.readBadgeBarWidth() } });
           this.post({ type: 'setGraphColors', payload: { colors: this.readGraphColors() } });
           this.post({ type: 'setGraphLaneSpacing', payload: { spacing: readGraphLaneSpacing() } });
+          this.post({ type: 'setShowSignatureStatus', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('showSignatureStatus', true) } });
           this.post({ type: 'setLoadMoreCount', payload: { count: readLoadMoreCommitCount() } });
           this.post({ type: 'setInteractiveRebaseMode', payload: { mode: readInteractiveRebaseMode() } });
           this.post({ type: 'setAlwaysShowCommitDetails', payload: { enabled: vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('alwaysShowCommitDetails', false) } });

@@ -403,6 +403,7 @@
     displayCommits;
     uiStore.dateTimeFormat;
     uiStore.relativeDateFallbackFormat;
+    uiStore.showSignatureStatus;
     fittedWidths = untrack(measureColumnWidths);
   });
 
@@ -420,7 +421,7 @@
       for (const commit of displayCommits) {
         if (commit.hash === 'UNCOMMITTED') continue;
         const text = index === 0 ? commit.author.name : index === 1 ? commit.abbreviatedHash : formatDate(commit.author.date);
-        const decorations = index === 0 ? 28 + parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0;
+        const decorations = index === 0 ? 28 + (uiStore.showSignatureStatus ? parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0) : 0;
         width = Math.max(width, context.measureText(text).width + decorations + 20);
       }
       return Math.max(MIN_COLUMN_WIDTHS[index], Math.min(100000, Math.ceil(width)));
@@ -1365,7 +1366,7 @@
               <img class="avatar-sm" src={avatarStore.url(commit.author.email, 20)} alt="" />
               <span class="author-name truncate">{commit.author.name}</span>
             </span>
-            {#if commit.signatureStatus && commit.signatureStatus !== 'none'}
+            {#if uiStore.showSignatureStatus && commit.signatureStatus && commit.signatureStatus !== 'none'}
               <i
                 class="codicon codicon-{commit.signatureStatus === 'good' || commit.signatureStatus === 'unknown-trust' ? 'pass' : 'question'} sig-icon sig-icon-{commit.signatureStatus}"
                 use:tooltip={commit.signatureStatus === 'good' ? t('signature.verified') : commit.signatureStatus === 'unknown-trust' ? t('signature.unknownTrust') : t('signature.unverified')}
