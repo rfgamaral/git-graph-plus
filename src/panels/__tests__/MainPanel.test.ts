@@ -7,6 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const H = vi.hoisted(() => {
   const git: Record<string, ReturnType<typeof vi.fn>> = {
     log: vi.fn(async () => []),
+    getCommitSignature: vi.fn(),
+    getCachedCommitSignature: vi.fn(),
     branches: vi.fn(async () => []),
     tags: vi.fn(async () => []),
     remotes: vi.fn(async () => []),
@@ -133,6 +135,7 @@ beforeEach(() => {
   // Reset default git behaviour after clearAllMocks wiped implementations.
   for (const k of Object.keys(H.git)) H.git[k].mockReset();
   H.git.log.mockResolvedValue([]);
+  H.git.getCommitSignature.mockResolvedValue({ status: 'none' });
   H.git.branches.mockResolvedValue([]);
   H.git.tags.mockResolvedValue([]);
   H.git.remotes.mockResolvedValue([]);
@@ -157,6 +160,93 @@ afterEach(() => {
 const commit = (hash: string) => ({
   hash, abbreviatedHash: hash.slice(0, 7), subject: 's', body: '', parents: [], refs: [],
   author: { name: '', email: '', date: '' }, committer: { name: '', email: '', date: '' },
+});
+
+describe('MainPanel graph signatures', () => {
+  const hashes = ['a', 'b', 'c', 'd'].map(char => char.repeat(40));
+  let finishSignature: (signature: { status: string }) => void;
+  let pendingSignature: Promise<{ status: string }>;
+
+  beforeEach(() => {
+    pendingSignature = new Promise(resolve => { finishSignature = resolve; });
+    H.git.getCommitSignature.mockReturnValueOnce(pendingSignature);
+  });
+
+  it('posts unsigned history before verification and skips synthetic rows and lookahead', async () => {
+    H.git.log.mockResolvedValue([commit('UNCOMMITTED'), commit(hashes[0]), commit(hashes[1])]);
+    await dispatch({ type: 'getLog', payload: { limit: 2 } });
+    expect(H.git.log).toHaveBeenCalledWith(expect.objectContaining({ includeSignature: false }));
+    expect(postedOfType('logData')[0].payload?.commits).toEqual([commit('UNCOMMITTED'), commit(hashes[0])]);
+    expect(H.git.getCommitSignature).toHaveBeenCalledExactlyOnceWith(hashes[0]);
+    expect(postedOfType('graphSignatureData')).toEqual([]);
+    finishSignature({ status: 'good' });
+    await pendingSignature;
+    expect(postedOfType('graphSignatureData')).toEqual([{
+      type: 'graphSignatureData', payload: { repo: '/repo', hash: hashes[0], status: 'good' },
+    }]);
+    expect(H.git.getCommitSignature).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one worker and replaces queued history with the latest job', async () => {
+    H.git.log.mockResolvedValueOnce([commit(hashes[0]), commit(hashes[1])])
+      .mockResolvedValueOnce([commit(hashes[2])])
+      .mockResolvedValueOnce([commit(hashes[3])]);
+    await dispatch({ type: 'getLog', payload: {} });
+    await dispatch({ type: 'getLog', payload: {} });
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(H.git.getCommitSignature).toHaveBeenCalledExactlyOnceWith(hashes[0]);
+    finishSignature({ status: 'good' });
+    await vi.waitFor(() => expect(postedOfType('graphSignatureData')).toEqual([{
+      type: 'graphSignatureData', payload: { repo: '/repo', hash: hashes[3], status: 'none' },
+    }]));
+    expect(H.git.getCommitSignature.mock.calls).toEqual([[hashes[0]], [hashes[3]]]);
+  });
+
+  it('verifies cache hits before uncached commits in history order', async () => {
+    H.git.getCachedCommitSignature.mockImplementation(hash => hash === hashes[1] ? { status: 'good' } : undefined);
+    H.git.log.mockResolvedValue(hashes.slice(0, 3).map(commit));
+    await dispatch({ type: 'getLog', payload: {} });
+    expect(H.git.getCommitSignature).toHaveBeenCalledExactlyOnceWith(hashes[1]);
+    finishSignature({ status: 'good' });
+    await vi.waitFor(() => expect(postedOfType('graphSignatureData')).toHaveLength(3));
+    expect(H.git.getCommitSignature.mock.calls).toEqual([[hashes[1]], [hashes[0]], [hashes[2]]]);
+  });
+
+  it.each(['status', 'full'] as const)('posts a %s refresh without waiting for signatures', async (scope) => {
+    H.git.log.mockResolvedValue([commit(hashes[0])]);
+    await (MainPanel.currentPanel as unknown as { refreshAll(scope: 'status' | 'full'): Promise<void> }).refreshAll(scope);
+    expect(H.git.log).toHaveBeenCalledWith(expect.objectContaining({ includeSignature: false }));
+    expect(postedOfType(scope === 'status' ? 'logData' : 'fullRefresh')).toHaveLength(1);
+    expect(postedOfType('graphSignatureData')).toEqual([]);
+    finishSignature({ status: 'none' });
+    await pendingSignature;
+    expect(postedOfType('graphSignatureData')).toHaveLength(1);
+  });
+
+  it.each(['repo', 'dispose', 'config'] as const)('discards pending signatures after %s changes', async (change) => {
+    H.git.log.mockResolvedValueOnce([commit(hashes[0]), commit(hashes[1])]);
+    await dispatch({ type: 'getLog', payload: {} });
+    if (change === 'repo') {
+      H.repos.push({ path: '/repo-b', name: 'repo-b', type: 'root' });
+      await dispatch({ type: 'getRepoList' });
+      await dispatch({ type: 'switchRepo', payload: { path: '/repo-b' } });
+    } else if (change === 'dispose') {
+      (MainPanel.currentPanel as unknown as { dispose(): void }).dispose();
+    } else {
+      H.config.showSignatureStatus = false;
+      H.configHandler!({ affectsConfiguration: key => key === 'gitGraphPlus.showSignatureStatus' });
+      await vi.waitFor(() => expect(postedOfType('fullRefresh')).toHaveLength(1));
+    }
+    finishSignature({ status: 'good' });
+    await pendingSignature;
+    expect(postedOfType('graphSignatureData')).toEqual([]);
+    expect(H.git.getCommitSignature).toHaveBeenCalledTimes(1);
+    if (change === 'config') {
+      H.git.log.mockResolvedValue([commit(hashes[2])]);
+      await dispatch({ type: 'getLog', payload: {} });
+      expect(H.git.getCommitSignature).toHaveBeenCalledTimes(1);
+    }
+  });
 });
 
 describe('MainPanel conflict opening', () => {

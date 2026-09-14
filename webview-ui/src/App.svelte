@@ -255,6 +255,12 @@ import AmendModal from './components/modals/AmendModal.svelte';
           commitStore.setData(msg.payload);
           pruneInvalidSelection();
           break;
+        case 'graphSignatureData': {
+          if (uiStore.activeRepo !== msg.payload.repo) break;
+          const commit = commitStore.getCommit(msg.payload.hash);
+          if (commit) commit.signatureStatus = msg.payload.status;
+          break;
+        }
         case 'branchData':
           branchStore.setData(msg.payload);
           syncStashPreview(msg.payload.stashes);

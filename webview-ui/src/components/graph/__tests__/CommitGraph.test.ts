@@ -350,6 +350,26 @@ describe('CommitGraph columns', () => {
     uiStore.dateTimeFormat = originalDateFormat;
   });
 
+  it('reserves badge space before verification and keeps widths stable through results and refreshes', async () => {
+    commitStore.commits[0].author.name = 'Long author name';
+    const { container } = render(CommitGraph, {});
+    await tick();
+    const fitted = widths(container);
+    expect(fitted).toEqual([228, 55, 70]);
+    for (const status of ['good', 'unverified', 'none'] as const) {
+      commitStore.commits[0].signatureStatus = status;
+      await tick();
+      expect(widths(container)).toEqual(fitted);
+      expect(container.querySelector('.sig-icon') !== null).toBe(status !== 'none');
+      commitStore.setData(makeGraphData([{ ...commitStore.commits[0] }]));
+      await tick();
+      expect(widths(container)).toEqual(fitted);
+    }
+    commitStore.setData(makeGraphData([{ ...commitStore.commits[0], signatureStatus: undefined }]));
+    await tick();
+    expect(widths(container)).toEqual(fitted);
+  });
+
   it('protects description width and clamps columns to a shrinking viewport', async () => {
     const { container } = render(CommitGraph, {});
     await tick();
@@ -370,7 +390,7 @@ describe('CommitGraph columns', () => {
   it('auto-fits using loaded content, including off-screen commits', async () => {
     const { container } = render(CommitGraph, {});
     await tick();
-    expect(widths(container)).toEqual([70, 55, 70]);
+    expect(widths(container)).toEqual([78, 55, 70]);
     const commits = Array.from({ length: 100 }, (_, i) => makeCommit(`h${i}`, 'commit'));
     commits[99].author.name = 'Long author name';
     commits[99].abbreviatedHash = '123456789abc';
@@ -391,7 +411,7 @@ describe('CommitGraph columns', () => {
     const { container } = render(CommitGraph, {});
     await tick();
     expect(container.querySelector('.column-resize')).toBeNull();
-    expect(widths(container)).toEqual([70, 55, 70]);
+    expect(widths(container)).toEqual([78, 55, 70]);
     expect(container.querySelector('.graph-header')).toBeNull();
     expect(container.querySelector('.context-menu')).toBeNull();
     commitStore.loading = true;
@@ -399,7 +419,7 @@ describe('CommitGraph columns', () => {
     longer.author.name = 'Long author name';
     commitStore.commits = [...commitStore.commits, longer];
     await tick();
-    expect(widths(container)).toEqual([70, 55, 70]);
+    expect(widths(container)).toEqual([78, 55, 70]);
     commitStore.loading = false;
     await tick();
     const fitted = widths(container);

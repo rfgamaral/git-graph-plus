@@ -7,9 +7,8 @@ export interface Commit {
   body: string;
   parents: string[];
   refs: Ref[];
-  /** GPG/SSH signature verification status. Present only when the log was
-   *  fetched with signature verification enabled (the graph setting); absent
-   *  otherwise so the graph icon stays hidden and there is no perf cost. */
+  /** GPG/SSH signature verification status. Absent until verification completes
+   *  or while signature badges are disabled. */
   signatureStatus?: SignatureStatus;
 }
 

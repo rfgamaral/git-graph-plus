@@ -59,6 +59,48 @@ afterEach(() => {
   cleanup();
 });
 
+describe('App — graph signatures', () => {
+  beforeEach(() => {
+    uiStore.activeRepo = '/repo';
+    commitStore.commits = [{
+      hash: 'a'.repeat(40), abbreviatedHash: 'aaaaaaa', subject: 'Signed commit', body: '', parents: [], refs: [],
+      author: { name: 'A', email: 'a@example.com', date: '2024-01-01T00:00:00Z' },
+      committer: { name: 'A', email: 'a@example.com', date: '2024-01-01T00:00:00Z' },
+    }];
+  });
+
+  it('updates only signature status without replacing history or selection', () => {
+    render(App);
+    const commits = commitStore.commits;
+    const commit = commits[0];
+    uiStore.selectCommit(commit.hash);
+    const setData = vi.spyOn(commitStore, 'setData');
+    try {
+      postMsg('graphSignatureData', { repo: '/repo', hash: commit.hash, status: 'good' });
+      expect(commit.signatureStatus).toBe('good');
+      postMsg('graphSignatureData', { repo: '/repo', hash: commit.hash, status: 'unverified' });
+      expect(commit.signatureStatus).toBe('unverified');
+      postMsg('graphSignatureData', { repo: '/repo', hash: commit.hash, status: 'none' });
+      expect(commit.signatureStatus).toBe('none');
+      expect(commitStore.commits).toBe(commits);
+      expect(commitStore.getCommit(commit.hash)).toBe(commit);
+      expect(uiStore.selectedCommitHash).toBe(commit.hash);
+      expect(setData).not.toHaveBeenCalled();
+    } finally {
+      setData.mockRestore();
+    }
+  });
+
+  it('ignores signatures for another repository or a missing commit', () => {
+    render(App);
+    const commit = commitStore.commits[0];
+    postMsg('graphSignatureData', { repo: '/other', hash: commit.hash, status: 'good' });
+    postMsg('graphSignatureData', { repo: '/repo', hash: 'b'.repeat(40), status: 'good' });
+    expect(commit.signatureStatus).toBeUndefined();
+    expect(commitStore.commits).toHaveLength(1);
+  });
+});
+
 describe('App — initial requests', () => {
   it('posts getLog, getBranches, and checkFlowStatus on mount', async () => {
     render(App);

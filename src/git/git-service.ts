@@ -80,6 +80,7 @@ export class GitService {
 
   private logCache: { key: string; commits: Commit[] } | undefined;
   private logSequence = 0;
+  private signatureCache = new Map<string, { signature: CommitSignature; expiresAt: number }>();
 
   constructor(private repoPath: string) {}
 
@@ -335,31 +336,43 @@ export class GitService {
 
   /**
    * Verify a single commit's signature on demand (for the Commit Details
-   * panel). Unlike the graph-wide setting, this only verifies one commit so it
-   * is cheap regardless of repo size. Failures degrade to "no signature" rather
-   * than throwing, so the panel never breaks on an unverifiable commit.
+   * panel). Failures return "unverified" rather than throwing.
    */
   async getCommitSignature(hash: string): Promise<CommitSignature> {
     this.assertSafeRef(hash, 'getCommitSignature');
-    try {
-      const out = await this.exec(
-        ['show', '--no-patch', '--format=%G?%x00%GS%x00%GK', hash],
-        { silent: true },
-      );
-      const [code = '', signer = '', keyId = ''] = out.split('\x00');
-      const sig: CommitSignature = { status: mapSignatureStatus(code) ?? 'none' };
-      const signerTrimmed = signer.trim();
-      const keyIdTrimmed = keyId.trim();
-      if (signerTrimmed) sig.signer = signerTrimmed;
-      if (keyIdTrimmed) sig.keyId = keyIdTrimmed;
-      return sig;
-    } catch (err) {
-      this.warn(`failed to get commit signature: ${err instanceof Error ? err.message : err}`);
-      return { status: 'none' };
-    }
+    const cached = this.getCachedCommitSignature(hash);
+    if (cached) return cached;
+    this.signatureCache.delete(hash);
+    return this.dedupe(`getCommitSignature:${hash}`, async () => {
+      let signature: CommitSignature = { status: 'unverified' };
+      try {
+        const out = await this.exec(
+          ['show', '--no-show-signature', '--no-patch', '--format=%G?%x00%GS%x00%GK', hash],
+          { silent: true, timeout: Math.min(5000, this.defaultTimeoutMs), killProcessTree: true },
+        );
+        const [code = '', signer = '', keyId = ''] = out.split('\x00');
+        signature = { status: mapSignatureStatus(code) ?? 'unverified' };
+        const signerTrimmed = signer.trim();
+        const keyIdTrimmed = keyId.trim();
+        if (signerTrimmed) signature.signer = signerTrimmed;
+        if (keyIdTrimmed) signature.keyId = keyIdTrimmed;
+      } catch (err) {
+        console.warn(`Git Graph+: failed to get commit signature: ${err instanceof Error ? err.message : err}`);
+      }
+      this.signatureCache.set(hash, { signature, expiresAt: Date.now() + 60000 });
+      if (this.signatureCache.size > 1000) {
+        this.signatureCache.delete(this.signatureCache.keys().next().value!);
+      }
+      return signature;
+    });
   }
 
-  private exec(args: string[], options?: { stdin?: string; timeout?: number; silent?: boolean; maxBufferBytes?: number }): Promise<string> {
+  getCachedCommitSignature(hash: string): CommitSignature | undefined {
+    const cached = this.signatureCache.get(hash);
+    return cached && cached.expiresAt > Date.now() ? cached.signature : undefined;
+  }
+
+  private exec(args: string[], options?: { stdin?: string; timeout?: number; silent?: boolean; maxBufferBytes?: number; killProcessTree?: boolean }): Promise<string> {
     const startTime = Date.now();
     const command = `git ${args.join(' ')}`;
     const timeoutMs = options?.timeout ?? this.defaultTimeoutMs;
@@ -377,6 +390,7 @@ export class GitService {
     return new Promise((resolve, reject) => {
       const proc = spawn(getGitBinaryPath(), spawnArgs, {
         cwd: this.repoPath,
+        ...(options?.killProcessTree && process.platform !== 'win32' ? { detached: true } : {}),
         env: { ...process.env, ...this.extraEnv, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', GIT_MERGE_AUTOEDIT: 'no', GIT_EDITOR: 'true', EDITOR: 'true' },
       });
 
@@ -395,6 +409,18 @@ export class GitService {
       };
 
       const killHard = () => {
+        if (options?.killProcessTree && proc.pid) {
+          try {
+            if (process.platform === 'win32') {
+              spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+                .on('error', () => { try { proc.kill('SIGKILL'); } catch {} })
+                .on('exit', code => { if (code !== 0) { try { proc.kill('SIGKILL'); } catch {} } });
+            } else {
+              process.kill(-proc.pid, 'SIGKILL');
+            }
+          } catch { try { proc.kill('SIGKILL'); } catch {} }
+          return;
+        }
         try { proc.kill('SIGTERM'); } catch { /* already dead */ }
         setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* already dead */ } }, 5000);
       };
@@ -501,6 +527,7 @@ export class GitService {
       + (options?.includeSignature ? '%x00%G?' : '');
     const args = [
       'log',
+      '--no-show-signature',
       `--format=${format}`,
     ];
 
@@ -596,7 +623,7 @@ export class GitService {
       if (stashHashes.length > 0) {
         try {
           const stashRaw = await this.exec([
-            'log', '--no-walk',
+            'log', '--no-show-signature', '--no-walk',
             '--format=%x01%x02%x03%H%x00%h%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI%x00%s%x00%P%x00%D%x00%b',
             ...stashHashes,
           ]);
@@ -767,7 +794,7 @@ export class GitService {
     return this.dedupe('stashList', async () => {
       try {
         const raw = await this.exec([
-          'stash', 'list', '--format=%gd%x00%gs%x00%aI%x00%P%x00%H',
+          'stash', 'list', '--no-show-signature', '--format=%gd%x00%gs%x00%aI%x00%P%x00%H',
         ]);
         return parseStashList(raw);
       } catch (err) {

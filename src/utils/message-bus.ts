@@ -160,6 +160,7 @@ export type ExtensionMessage =
   | { type: 'fullRefresh'; payload: { logData: CommitGraphData; branchData: BranchData } }
   | { type: 'commitDiffData'; payload: { hash?: string; diffs?: DiffData[]; files: Array<{ path: string; status: string }> } }
   | { type: 'commitSignatureData'; payload: { hash: string; signature: CommitSignature } }
+  | { type: 'graphSignatureData'; payload: { repo: string; hash: string; status: CommitSignature['status'] } }
   | { type: 'rebaseSettings'; payload: { requestId: string; updateRefs: boolean; supported: boolean; error?: string } }
   | { type: 'rebaseCommitsData'; payload: { base: string; commits: Commit[] } }
   | { type: 'searchResults'; payload: CommitGraphData }

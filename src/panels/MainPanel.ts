@@ -23,7 +23,7 @@ import {
   assertSafeArgPath as assertSafeArgPathUtil,
 } from '../utils/path-validation';
 import { SequenceGuard } from '../utils/sequence-guard';
-import type { StashEntry } from '../git/types';
+import type { Commit, StashEntry } from '../git/types';
 import { resolveDefaultWorktreePath } from '../utils/worktree-path';
 
 export class MainPanel {
@@ -56,6 +56,8 @@ export class MainPanel {
   private pendingFilterRestore: Promise<void> | undefined;
   private logSequence = 0;
   private searchSequence = 0;
+  private signatureQueue: { hashes: string[]; service: GitService; repo: string; sequence: number } | undefined;
+  private signatureWorkerRunning = false;
   // Two independent guards: selecting a commit (loads its file list) and
   // selecting a file (loads that file's diff) are different axes, so a file
   // request must not invalidate a pending commit-files request and vice versa.
@@ -218,6 +220,10 @@ export class MainPanel {
         }
         if (e.affectsConfiguration('gitGraphPlus.graphSortOrder')) {
           this.refreshAll();
+        }
+        if (e.affectsConfiguration('gitGraphPlus.showSignatureStatus')) {
+          this.signatureQueue = undefined;
+          void this.refreshAll();
         }
         if (e.affectsConfiguration('gitGraphPlus.locale')) {
           const localeSetting = vscode.workspace.getConfiguration('gitGraphPlus').get<string>('locale', 'auto');
@@ -568,7 +574,7 @@ export class MainPanel {
           if (this.disposed || seq !== this.logSequence || gitService !== this.gitService) break;
           const cfg = vscode.workspace.getConfiguration('gitGraphPlus');
           const sortOrder = cfg.get<'author-date' | 'date' | 'topological'>('graphSortOrder', 'topological');
-          const includeSignature = cfg.get<boolean>('showSignatureStatus', true);
+          const includeSignature = false;
           const requestedLimit = message.payload.limit ?? readInitialCommitCount();
           this.currentLimit = requestedLimit;
           const effectiveFilter = message.payload.remoteFilter ?? this.currentRemoteFilter;
@@ -604,6 +610,7 @@ export class MainPanel {
               branches: effectiveBranchFilter,
             },
           });
+          this.queueGraphSignatures(commits, gitService, seq);
           break;
         }
         case 'getBranches': {
@@ -1342,8 +1349,11 @@ export class MainPanel {
           break;
         }
         case 'getCommitSignature': {
-          const signature = await this.gitService.getCommitSignature(message.payload.hash);
-          this.post({ type: 'commitSignatureData', payload: { hash: message.payload.hash, signature } });
+          const gitService = this.gitService;
+          const signature = await gitService.getCommitSignature(message.payload.hash);
+          if (gitService === this.gitService) {
+            this.post({ type: 'commitSignatureData', payload: { hash: message.payload.hash, signature } });
+          }
           break;
         }
         case 'searchCommits': {
@@ -2016,7 +2026,7 @@ export class MainPanel {
       if (gitService !== this.gitService || seq !== this.logSequence) return;
       const refreshCfg = vscode.workspace.getConfiguration('gitGraphPlus');
       const sortOrder = refreshCfg.get<'author-date' | 'date' | 'topological'>('graphSortOrder', 'topological');
-      const includeSignature = refreshCfg.get<boolean>('showSignatureStatus', true);
+      const includeSignature = false;
       const refreshLimit = this.currentLimit || readInitialCommitCount();
       const remoteFilter = this.currentRemoteFilter;
       const branchFilter = this.currentBranchFilter;
@@ -2040,6 +2050,7 @@ export class MainPanel {
         ]);
         if (gitService !== this.gitService || seq !== this.logSequence) return;
         this.post({ type: 'logData', payload: buildLogData(allFetched, branches) });
+        this.queueGraphSignatures(allFetched.slice(0, refreshLimit), gitService, seq);
       } else {
         const [allFetched, branches, tags, remotes, stashes, worktrees] = await Promise.all([
           gitService.log(logArgs),
@@ -2058,6 +2069,7 @@ export class MainPanel {
             branchData: { branches, tags, remotes, stashes, worktrees },
           },
         });
+        this.queueGraphSignatures(allFetched.slice(0, refreshLimit), gitService, seq);
         MainPanel.onSidebarRefresh?.();
       }
     } catch (err) {
@@ -2074,6 +2086,34 @@ export class MainPanel {
         this.queuedScope = 'status';
         this.refreshAll(next);
       }
+    }
+  }
+
+  private queueGraphSignatures(commits: Commit[], service: GitService, sequence: number): void {
+    if (this.disposed || service !== this.gitService || sequence !== this.logSequence) return;
+    this.signatureQueue = vscode.workspace.getConfiguration('gitGraphPlus').get<boolean>('showSignatureStatus', true)
+      ? { hashes: commits.map(c => c.hash).filter(hash => /^(?:[a-f\d]{40}|[a-f\d]{64})$/i.test(hash)).reverse(), service, repo: this.repoPath, sequence }
+      : undefined;
+    this.signatureQueue?.hashes.sort((a, b) => Number(!!service.getCachedCommitSignature(a)) - Number(!!service.getCachedCommitSignature(b)));
+    if (!this.signatureWorkerRunning) void this.loadGraphSignatures();
+  }
+
+  private async loadGraphSignatures(): Promise<void> {
+    this.signatureWorkerRunning = true;
+    try {
+      while (!this.disposed) {
+        const job = this.signatureQueue;
+        if (!job || job.service !== this.gitService || job.sequence !== this.logSequence) return;
+        const hash = job.hashes.pop();
+        if (!hash) return;
+        const signature = await job.service.getCommitSignature(hash);
+        if (this.disposed || job !== this.signatureQueue || job.service !== this.gitService || job.sequence !== this.logSequence) continue;
+        this.post({ type: 'graphSignatureData', payload: { repo: job.repo, hash, status: signature.status } });
+      }
+    } catch (err) {
+      console.warn('Git Graph+: signature loading failed:', err);
+    } finally {
+      this.signatureWorkerRunning = false;
     }
   }
 

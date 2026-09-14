@@ -9,7 +9,7 @@ export interface Commit {
   body: string;
   parents: string[];
   refs: Ref[];
-  /** Present only when the graph is fetched with signature verification on. */
+  /** Present after background verification when graph signature badges are enabled. */
   signatureStatus?: SignatureStatus;
 }
 

@@ -420,7 +420,7 @@
       for (const commit of displayCommits) {
         if (commit.hash === 'UNCOMMITTED') continue;
         const text = index === 0 ? commit.author.name : index === 1 ? commit.abbreviatedHash : formatDate(commit.author.date);
-        const decorations = index === 0 ? 28 + (commit.signatureStatus && commit.signatureStatus !== 'none' ? parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0) : 0;
+        const decorations = index === 0 ? 28 + parseFloat(cellStyle.fontSize) * 0.95 + 4 : 0;
         width = Math.max(width, context.measureText(text).width + decorations + 20);
       }
       return Math.max(MIN_COLUMN_WIDTHS[index], Math.min(100000, Math.ceil(width)));
