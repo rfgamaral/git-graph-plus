@@ -65,6 +65,7 @@
   // Rebuild the rendered list from the untouched `originalTodos` snapshot.
   function rebuildTodos(on: boolean) {
     autosquashOn = on;
+    groupPrints = {};
     todos = on
       ? (applyAutosquash(originalTodos) as TodoEntry[])
       : originalTodos.map(t => ({ ...t }));
@@ -113,6 +114,8 @@
     while (i < todos.length && (todos[i].action === 'squash' || todos[i].action === 'fixup')) {
       if (todos[i].action === 'squash') {
         parts.push(fullMessage(todos[i]));
+      } else if (autosquashOn && todos[i].subject.startsWith('amend! ') && todos[i].body.trim()) {
+        parts.splice(0, parts.length, todos[i].body.trim());
       }
       i++;
     }
@@ -136,7 +139,7 @@
   // then compare against whatever group used to sit there and wrongly "reset"
   // the user's manually edited combined message. The hash is stable across
   // reordering, so the edit survives unless the group's composition changes.
-  const groupPrints = $state<Record<string, string>>({});
+  let groupPrints = $state<Record<string, string>>({});
 
   $effect.pre(() => {
     // Re-run when the list shape changes…

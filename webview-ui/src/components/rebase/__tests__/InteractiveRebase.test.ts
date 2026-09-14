@@ -537,6 +537,74 @@ describe('InteractiveRebase — keyboard navigation', () => {
 });
 
 describe('InteractiveRebase — autosquash', () => {
+  it.each([
+    { members: [{ subject: 'amend! target', body: 'Replacement\n\nNew body' }], expected: 'Replacement\n\nNew body' },
+    {
+      members: [
+        { subject: 'squash! target', body: 'Discarded squash body' },
+        { subject: 'amend! target', body: 'First replacement' },
+        { subject: 'fixup! target', body: 'Ignored fixup body' },
+        { subject: 'amend! target', body: 'Last replacement\n\nLast body' },
+        { subject: 'squash! target', body: 'Retained squash body' },
+      ],
+      expected: 'Last replacement\n\nLast body\n\nsquash! target\n\nRetained squash body',
+    },
+  ])('shows and submits amend replacement messages: $expected', async ({ members, expected }) => {
+    const { container } = render(InteractiveRebase, baseProps);
+    deliverCommits([
+      commit({ hash: 'target', subject: 'target', body: 'Old body' }),
+      ...members.map((member, i) => commit({ hash: `member${i}`, ...member })),
+    ]);
+    await deliverRebaseSettings();
+    const message = () => container.querySelector<HTMLTextAreaElement>('.todo-message-input')!.value;
+    expect(message()).toBe(expected);
+    const toggle = container.querySelector<HTMLInputElement>('.autosquash-switch input')!;
+    await fireEvent.click(toggle);
+    await fireEvent.click(toggle);
+    expect(message()).toBe(expected);
+    await fireEvent.click(container.querySelector<HTMLButtonElement>('button.primary')!);
+    const request = globalThis.__postedMessages.find(m =>
+      (m.data as { type: string }).type === 'interactiveRebase',
+    )!.data as { payload: { todos: Array<{ action: string; message?: string }> } };
+    expect(request.payload.todos[0]).toMatchObject({ action: 'reword', message: expected });
+    expect(request.payload.todos.slice(1).every(todo => todo.message === undefined)).toBe(true);
+  });
+
+  it('recomputes the replacement when amend members are reordered or removed', async () => {
+    const { container } = render(InteractiveRebase, baseProps);
+    deliverCommits([
+      commit({ hash: 'target', subject: 'target' }),
+      commit({ hash: 'first', subject: 'amend! target', body: 'First replacement' }),
+      commit({ hash: 'last', subject: 'amend! target', body: 'Last replacement' }),
+    ]);
+    await tick();
+    const message = () => container.querySelector<HTMLTextAreaElement>('.todo-message-input')!.value;
+    expect(message()).toBe('Last replacement');
+    await fireEvent.click(container.querySelectorAll<HTMLButtonElement>('.move-btn')[4]);
+    expect(message()).toBe('First replacement');
+    await fireEvent.mouseDown(container.querySelectorAll('.todo-item')[2]);
+    await fireEvent.keyDown(window, { key: 'd' });
+    expect(message()).toBe('Last replacement');
+  });
+
+  it('keeps manual amend group edits when an unrelated row moves', async () => {
+    const { container } = render(InteractiveRebase, baseProps);
+    deliverCommits([
+      commit({ hash: 'unrelated', subject: 'Unrelated' }),
+      commit({ hash: 'target', subject: 'target' }),
+      commit({ hash: 'amend', subject: 'amend! target', body: 'Replacement' }),
+    ]);
+    await tick();
+    const textarea = container.querySelector<HTMLTextAreaElement>('.todo-message-input')!;
+    await fireEvent.input(textarea, { target: { value: 'Manual replacement\n\nManual body' } });
+    const rows = container.querySelectorAll('.todo-item');
+    await fireEvent.dragStart(rows[0]);
+    await fireEvent.dragOver(rows[2]);
+    await fireEvent.dragEnd(rows[0]);
+    expect(container.querySelector<HTMLTextAreaElement>('.todo-message-input')!.value)
+      .toBe('Manual replacement\n\nManual body');
+  });
+
   it('auto-arranges fixup! commits under their target on load (toggle on)', async () => {
     const { container } = render(InteractiveRebase, baseProps);
     deliverCommits([

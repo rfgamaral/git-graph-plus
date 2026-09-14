@@ -646,6 +646,22 @@ describe('GitService integration — merge / rebase / cherry-pick / revert', () 
       expect(fullMsg).toBe('combined title\n\n- item one\n- item two');
     });
 
+    it('uses the visual editor replacement message after amend fixups', async () => {
+      commit(repo.path, 'init');
+      const base = head(repo.path);
+      const target = commit(repo.path, 'target\n\nOld body', { 'a.txt': 'A\n' });
+      const amend = commit(repo.path, 'amend! target\n\nReplacement\n\nNew body', { 'b.txt': 'B\n' });
+
+      await svc.interactiveRebase(base, [
+        { action: 'reword', hash: target, subject: 'target', message: 'Replacement\n\nNew body' },
+        { action: 'fixup', hash: amend, subject: 'amend! target' },
+      ]);
+
+      expect(runGit(repo.path, ['log', '-1', '--format=%B']).trim()).toBe('Replacement\n\nNew body');
+      expect(runGit(repo.path, ['rev-list', '--count', `${base}..HEAD`]).trim()).toBe('1');
+      expect(runGit(repo.path, ['show', 'HEAD:b.txt'])).toBe('B\n');
+    });
+
     it('fixup discards the squashed commits message (no exec amend)', async () => {
       commit(repo.path, 'init');
       const base = head(repo.path);
