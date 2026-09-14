@@ -13,8 +13,10 @@ export interface Commit {
   signatureStatus?: SignatureStatus;
 }
 
-/** Simplified 3-state mapping of git's `%G?` verification codes. */
-export type SignatureStatus = 'good' | 'none' | 'unverified';
+/**
+ * Signature validity and key trust from Git's `%G?` verification codes.
+ */
+export type SignatureStatus = 'good' | 'unknown-trust' | 'none' | 'unverified';
 
 /** On-demand signature details for a single commit (Details panel). */
 export interface CommitSignature {

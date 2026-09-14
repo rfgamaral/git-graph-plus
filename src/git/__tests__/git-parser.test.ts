@@ -64,7 +64,7 @@ describe('parseLog', () => {
       `\x01\x02\x03abc123\x00abc\x00Alice\x00a@x.com\x002024-01-01\x00Alice\x00a@x.com\x002024-01-01\x00Commit\x00\x00\x00\x00${code}`;
     expect(parseLog(make('G'))[0].signatureStatus).toBe('good');
     expect(parseLog(make('N'))[0].signatureStatus).toBe('none');
-    expect(parseLog(make('U'))[0].signatureStatus).toBe('unverified');
+    expect(parseLog(make('U'))[0].signatureStatus).toBe('unknown-trust');
     expect(parseLog(make('B'))[0].signatureStatus).toBe('unverified');
   });
 
@@ -77,13 +77,14 @@ describe('parseLog', () => {
 });
 
 describe('mapSignatureStatus', () => {
-  it('maps G to good and N to none', () => {
+  it('distinguishes trusted and unknown-trust signatures from unsigned commits', () => {
     expect(mapSignatureStatus('G')).toBe('good');
+    expect(mapSignatureStatus('U')).toBe('unknown-trust');
     expect(mapSignatureStatus('N')).toBe('none');
   });
 
   it('maps every other verification code to unverified', () => {
-    for (const code of ['B', 'U', 'X', 'Y', 'R', 'E']) {
+    for (const code of ['B', 'X', 'Y', 'R', 'E']) {
       expect(mapSignatureStatus(code)).toBe('unverified');
     }
   });

@@ -792,8 +792,8 @@
                   ><i class="codicon codicon-chevron-down"></i></button>
                   {#if signature && signature.status !== 'none'}
                     <i
-                      class="codicon codicon-{signature.status === 'good' ? 'pass' : 'question'} sig-glyph sig-glyph-{signature.status}"
-                      use:tooltip={signature.status === 'good' ? t('signature.verified') : t('signature.unverified')}
+                      class="codicon codicon-{signature.status === 'good' || signature.status === 'unknown-trust' ? 'pass' : 'question'} sig-glyph sig-glyph-{signature.status}"
+                      use:tooltip={signature.status === 'good' ? t('signature.verified') : signature.status === 'unknown-trust' ? t('signature.unknownTrust') : t('signature.unverified')}
                     ></i>
                   {/if}
                 </div>
@@ -1638,6 +1638,10 @@
 
   .sig-glyph-good {
     color: var(--vscode-testing-iconPassed, #4caf50);
+  }
+
+  .sig-glyph-unknown-trust {
+    color: var(--text-secondary);
   }
 
   .sig-glyph-unverified {

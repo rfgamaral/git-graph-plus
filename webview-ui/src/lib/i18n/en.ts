@@ -265,6 +265,7 @@ export const en: Record<string, string> = {
   'details.refs': 'Refs',
   'details.signature': 'Signature',
   'signature.verified': 'Verified',
+  'signature.unknownTrust': 'Valid signature; key trust is unknown',
   'signature.unverified': 'Unverified',
   'signature.none': 'No signature',
   'signature.signer': 'Signer',

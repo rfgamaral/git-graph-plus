@@ -48,7 +48,7 @@ function deliverLfs(files: Array<{ oid: string; path: string }>, locks: Array<{ 
   }));
 }
 
-function deliverSignature(hash: string, signature: { status: 'good' | 'none' | 'unverified'; signer?: string; keyId?: string }) {
+function deliverSignature(hash: string, signature: { status: 'good' | 'unknown-trust' | 'none' | 'unverified'; signer?: string; keyId?: string }) {
   window.dispatchEvent(new MessageEvent('message', {
     data: { type: 'commitSignatureData', payload: { hash, signature } },
   }));
@@ -205,16 +205,16 @@ describe('CommitDetails — signature', () => {
     expect(text).not.toContain('GPG Key ID');
   });
 
-  it('does not fabricate a signer from the committer for an unverified signature', async () => {
+  it.each(['unverified', 'unknown-trust'] as const)('does not fabricate a signer for %s signatures', async status => {
     const { container } = render(CommitDetails, { commit: commit({ hash: 'h1' }) });
     await waitFor(() => container.querySelector('.person-name'));
-    // git returns no %GS for an untrusted key — must not claim "Signed by <committer>".
-    deliverSignature('h1', { status: 'unverified', keyId: 'SHA256:UnTrust' });
+    deliverSignature('h1', { status, keyId: 'SHA256:UnTrust' });
     await waitFor(() => expect(container.querySelector('.sig-detail')).toBeTruthy());
     const text = container.querySelector('.sig-detail')?.textContent ?? '';
     expect(text).not.toContain('Signed by');
     expect(text).toContain('SSH Key: SHA256:UnTrust');
-    expect(container.querySelector('.sig-glyph.sig-glyph-unverified')).toBeTruthy();
+    const icon = status === 'unknown-trust' ? 'pass' : 'question';
+    expect(container.querySelector(`.sig-glyph-${status}.codicon-${icon}`)).toBeTruthy();
   });
 
   it('shows no signature row or glyph for an unsigned commit', async () => {

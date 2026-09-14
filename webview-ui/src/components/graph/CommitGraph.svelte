@@ -1367,8 +1367,8 @@
             </span>
             {#if commit.signatureStatus && commit.signatureStatus !== 'none'}
               <i
-                class="codicon codicon-{commit.signatureStatus === 'good' ? 'pass' : 'question'} sig-icon sig-icon-{commit.signatureStatus}"
-                use:tooltip={commit.signatureStatus === 'good' ? t('signature.verified') : t('signature.unverified')}
+                class="codicon codicon-{commit.signatureStatus === 'good' || commit.signatureStatus === 'unknown-trust' ? 'pass' : 'question'} sig-icon sig-icon-{commit.signatureStatus}"
+                use:tooltip={commit.signatureStatus === 'good' ? t('signature.verified') : commit.signatureStatus === 'unknown-trust' ? t('signature.unknownTrust') : t('signature.unverified')}
               ></i>
             {/if}
           </span>
@@ -2148,6 +2148,10 @@
 
   .sig-icon-good {
     color: var(--vscode-testing-iconPassed, #4caf50);
+  }
+
+  .sig-icon-unknown-trust {
+    color: var(--text-secondary);
   }
 
   .sig-icon-unverified {

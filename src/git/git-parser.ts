@@ -1,15 +1,15 @@
 import type { Commit, Ref, SignatureStatus, BranchInfo, TagInfo, RemoteInfo, StashEntry, DiffData, DiffHunk, DiffLine, WorktreeInfo } from './types';
 
-/** Map git's `%G?` signature verification code to our 3-state enum.
- *  `G` = valid signature → good; `N` = no signature → none; everything else
- *  (`B` bad, `U` unknown validity, `X` expired sig, `Y` expired key, `R`
- *  revoked key, `E` cannot check) collapses to unverified. Returns undefined
- *  for an empty code (signature column not requested). */
+/**
+ * Map Git's `%G?` code to signature validity and key trust. Empty codes indicate that verification
+ * was not requested.
+ */
 export function mapSignatureStatus(code: string): SignatureStatus | undefined {
   const c = code.trim();
   if (!c) return undefined;
   switch (c) {
     case 'G': return 'good';
+    case 'U': return 'unknown-trust';
     case 'N': return 'none';
     default: return 'unverified';
   }

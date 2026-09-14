@@ -433,15 +433,17 @@ describe('CommitGraph columns', () => {
 });
 
 describe('CommitGraph signature icon', () => {
-  it('renders a signature icon for good/unverified commits', async () => {
+  it('distinguishes trusted, unknown-trust, and unverified signature icons', async () => {
     commitStore.setData(makeGraphData([
       { ...makeCommit('h1', 'signed'), signatureStatus: 'good' },
       { ...makeCommit('h2', 'tampered', ['h1']), signatureStatus: 'unverified' },
+      { ...makeCommit('h3', 'valid, unknown trust', ['h2']), signatureStatus: 'unknown-trust' },
     ]));
     const { container } = render(CommitGraph, {});
     await tick();
-    expect(container.querySelector('.sig-icon.sig-icon-good')).toBeTruthy();
-    expect(container.querySelector('.sig-icon.sig-icon-unverified')).toBeTruthy();
+    expect(container.querySelector('.sig-icon-good.codicon-pass')).toBeTruthy();
+    expect(container.querySelector('.sig-icon-unverified.codicon-question')).toBeTruthy();
+    expect(container.querySelector('.sig-icon-unknown-trust.codicon-pass')).toBeTruthy();
   });
 
   it('omits the icon for "none" and when signatureStatus is absent', async () => {
