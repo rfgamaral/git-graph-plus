@@ -802,7 +802,7 @@
             </div>
           </div>
           <!-- Committer (Only show if different from author) -->
-          {#if commit.author.email !== commit.committer.email || commit.author.name !== commit.committer.name}
+          {#if commit.author.email !== commit.committer.email || commit.author.name !== commit.committer.name || commit.author.date !== commit.committer.date}
             <div class="info-column">
               <div class="info-label">{t('details.committer')}</div>
               <div class="person-info">
