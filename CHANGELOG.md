@@ -1,3 +1,44 @@
+# [0.10.0](https://github.com/rfgamaral/git-graph-plus/compare/v0.9.0...v0.10.0) (2026-09-15)
+
+
+### Bug Fixes
+
+* anchor dialogs while their content changes height ([cbb9656](https://github.com/rfgamaral/git-graph-plus/commit/cbb96566db1abe03a4ad6786406cf6e8bb2005ca))
+* check out the selected commit in detached HEAD state ([ee61e25](https://github.com/rfgamaral/git-graph-plus/commit/ee61e25c59f59df37f30bde2cbb58467676f01cf))
+* choose the mainline parent when reverting merge commits ([6c38d1b](https://github.com/rfgamaral/git-graph-plus/commit/6c38d1b7db7e166d0b19008d3dd14b270cce5f3b))
+* display readable messages instead of localization keys ([5ade3d5](https://github.com/rfgamaral/git-graph-plus/commit/5ade3d5643885f5c474b195a2a2750e91d068f66))
+* distinguish valid signatures with unknown key trust ([c2170dc](https://github.com/rfgamaral/git-graph-plus/commit/c2170dc779a7efec3345fdc3f7ee1bb7fb8f43fe))
+* hide the open button on Git Graph tabs ([9951ef5](https://github.com/rfgamaral/git-graph-plus/commit/9951ef5069d2189efcc023cd6fc4090d642f1fb6))
+* improve interactive rebase alignment and dropdown behavior ([3fb1c24](https://github.com/rfgamaral/git-graph-plus/commit/3fb1c2411732e029886b5b5256f8198be3d3c4e9))
+* keep dialogs open when clicking outside ([9e6d295](https://github.com/rfgamaral/git-graph-plus/commit/9e6d29518686b3a0e3730861a38f24f1bfba959e))
+* load history without waiting for signature verification ([7500b31](https://github.com/rfgamaral/git-graph-plus/commit/7500b31700c91a8201cac9be65aa4e99e9ef6c11))
+* make badges readable in light high-contrast themes ([390ca23](https://github.com/rfgamaral/git-graph-plus/commit/390ca239e18cd0ef3d8d70142c73afd6bba2caa3)), closes [hi#contrast](https://github.com/hi/issues/contrast)
+* preserve amend messages during autosquash ([5ef75e4](https://github.com/rfgamaral/git-graph-plus/commit/5ef75e4723b01fabe581995912cbd29355e8480e))
+* reserve signature icon space only when enabled ([1a5915e](https://github.com/rfgamaral/git-graph-plus/commit/1a5915eba51a026ca491e7864a100abc05717e3a))
+* respect native Git conflict editor preferences ([aa13e27](https://github.com/rfgamaral/git-graph-plus/commit/aa13e27cdb240660820e5b85b5a192dea4cd5382))
+* show the committer when commit dates differ ([2d6a70c](https://github.com/rfgamaral/git-graph-plus/commit/2d6a70cdd4c2d1703a5eabc9bcda2d8031376ad6))
+* stabilize conflict status layout and widen file popovers ([a198d52](https://github.com/rfgamaral/git-graph-plus/commit/a198d520aabdc774fcdbef623c40ae21c1bc2d4c))
+* use VS Code theme colors for file status labels ([ad7d8fe](https://github.com/rfgamaral/git-graph-plus/commit/ad7d8fe6b17ed9a699a9c67caf09dff75da02650))
+
+
+### Features
+
+* add a View menu with per-repository visibility options ([912a8f5](https://github.com/rfgamaral/git-graph-plus/commit/912a8f5811a015df13826def6e207eaefc40b99e))
+* add Git-config-aware dependent branch updates for rebase ([40d61d0](https://github.com/rfgamaral/git-graph-plus/commit/40d61d05a8d7f0415be7377c81f7db1b59b17148))
+* add Reflog view controls and keep search feedback separate ([5aee307](https://github.com/rfgamaral/git-graph-plus/commit/5aee3073f996448c5c1e16b97fa4653a5df09135))
+* choose the remote and destination branch when pushing ([1a2e001](https://github.com/rfgamaral/git-graph-plus/commit/1a2e001e66fe7eaa6d20632146e8ef8508ceace5))
+* customize the date format behind relative timestamps ([e2879dc](https://github.com/rfgamaral/git-graph-plus/commit/e2879dc8951d5a3e48f3532e675a48fc9607feb1))
+* filter changed files and remember their list layout ([18719b2](https://github.com/rfgamaral/git-graph-plus/commit/18719b2bf15e6d13e174e1ad28c88c91d43b8c8a))
+* load older commits automatically while scrolling ([1b88c4b](https://github.com/rfgamaral/git-graph-plus/commit/1b88c4b9395b73e57d7828b502997c1baca12216))
+* make graph lane spacing configurable with a 13px default ([d1ed461](https://github.com/rfgamaral/git-graph-plus/commit/d1ed461892fe11ce5bddc3035a9c44fd45c387b6))
+* preview sidebar stashes in the Changes tab ([fc4e78a](https://github.com/rfgamaral/git-graph-plus/commit/fc4e78a9feee9480239d30840f948d0fda7b9635))
+* remember the diff layout globally ([88d2cbb](https://github.com/rfgamaral/git-graph-plus/commit/88d2cbb09350d6a267be187cdb0d99c86f45bb1a))
+* restore Activity with command search and view controls ([8033eb3](https://github.com/rfgamaral/git-graph-plus/commit/8033eb33dd413bf931c0f2c8e57500f0c1470a2e))
+* restore Git Graph tabs and working state ([da84257](https://github.com/rfgamaral/git-graph-plus/commit/da84257a90b050458340395a195fd1b9b6955144))
+* select HEAD when jumping and simplify the button states ([7e8fddb](https://github.com/rfgamaral/git-graph-plus/commit/7e8fddbe1d8a2b1e6e878b404235162b5e4d7a18))
+* show lost reflog commits in the graph ([dd4d7e7](https://github.com/rfgamaral/git-graph-plus/commit/dd4d7e784241044dba97fab136bec3aa23e9b81b))
+* simplify the graph layout and keep search inside its pane ([ce7806b](https://github.com/rfgamaral/git-graph-plus/commit/ce7806b4bfb7da5dd2d20d27461c28591b4cfe6c))
+
 # [0.9.0](https://github.com/rfgamaral/git-graph-plus/compare/v0.8.0...v0.9.0) (2026-09-11)
 
 
